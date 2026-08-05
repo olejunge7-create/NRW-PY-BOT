@@ -1,111 +1,103 @@
-import os
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-# Bot-Setup mit Server Members Intent (wichtig für Nicknamen)
-intents = discord.Intents.default()
-intents.members = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+# Alle 21 Rollen-IDs des Rang-Systems
+RANK_ROLES = [
+    1534325338182520991,  # Rang 1
+    1534325338182520992,  # Rang 2
+    1534325338182520993,  # Rang 3
+    1534325338182520994,  # Rang 4
+    1534325338199556137,  # Rang 5
+    1534325338199556138,  # Rang 6
+    1534325338199556139,  # Rang 7
+    1534325338199556140,  # Rang 8
+    1534325338199556142,  # Rang 9
+    1534325338199556143,  # Rang 10
+    1534325338199556145,  # Rang 11
+    1534325338199556146,  # Rang 12
+    1534325338212007978,  # Rang 13
+    1534325338212007979,  # Rang 14
+    1534325338212007980,  # Rang 15
+    1534325338212007981,  # Rang 16
+    1534325338212007982,  # Rang 17
+    1534325338212007983,  # Rang 18
+    1534325338212007984,  # Rang 19
+    1534325338212007985,  # Rang 20
+    1534325338212007986   # Rang 21
+]
 
+class RankSystem(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
-@bot.event
-async def on_ready():
-  print(f"Eingeloggt als {bot.user}")
-  try:
-    synced = await bot.tree.sync()
-    print(f"{len(synced)} Slash-Befehle synchronisiert.")
-  except Exception as e:
-    print(e)
+    def create_rank_embed(self, member: discord.Member, typ: str, alter_rang: str, neue_rolle: discord.Role) -> discord.Embed:
+        if typ == "promote":
+            title_text = "📈 **Beförderung**"
+            desc_text = "🎉 Herzlichen Glückwunsch! Aufgrund deiner Aktivität und deines Engagements wurdest du befördert.\nViel Erfolg in deiner neuen Position! 🚀"
+            color = discord.Color.green()
+        else:
+            title_text = "📉 **Degradierung**"
+            desc_text = "⚠️ Dein Rang auf dem Server wurde angepasst.\nWir hoffen, dich bald wieder oben zu sehen!"
+            color = discord.Color.red()
 
+        embed = discord.Embed(
+            title="╭━━━━━━━━━━━━━━━━━━━━━━━╮\n📢 RANGÄNDERUNG\n╰━━━━━━━━━━━━━━━━━━━━━━━╯",
+            description=(
+                f"👤 **Mitglied:** {member.mention}\n"
+                f"{title_text}\n\n"
+                f"**Alter Rang:** {alter_rang}\n"
+                f"➡️ **Neuer Rang:** {neue_rolle.name}\n\n"
+                f"{desc_text}"
+            ),
+            color=color
+        )
+        embed.set_footer(text="🤖 System  ")
+        return embed
 
-# --- UPRANK / PROMOTE ---
-@bot.tree.command(
-    name="promote", description="Befördere ein Teammitglied und setze den Rang-Präfix"
-)
-@app_commands.describe(
-    member="Das Teammitglied",
-    rang_name="Das Kürzel für den Namen (z.B. Mod, T-Sup)",
-    rolle="Die neue Discord-Rolle",
-    grund="Der Grund für den Uprank",
-)
-async def promote(
-    interaction: discord.Interaction,
-    member: discord.Member,
-    rang_name: str,
-    rolle: discord.Role,
-    grund: str,
-):
-  # 1. Rolle vergeben
-  await member.add_roles(rolle)
+    async def _change_rank(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, typ: str):
+        if neue_rolle.id not in RANK_ROLES:
+            await interaction.response.send_message("⚠️ Die angegebene Rolle ist keine gültige Rang-Rolle!", ephemeral=True)
+            return
 
-  # 2. Nicknamen anpassen (z.B. "Mod | Username")
-  neuer_nickname = f"{rang_name} | {member.name}"
-  try:
-    await member.edit(nick=neuer_nickname)
-  except discord.Forbidden:
-    pass  # Falls der Bot keine Rechte hat (z.B. Höherrangiger User)
+        # Alter Rang ermitteln und alte Rang-Rollen entfernen
+        alter_rang_name = "Kein Rang"
+        for role in member.roles:
+            if role.id in RANK_ROLES:
+                alter_rang_name = role.name
+                if role.id != neue_rolle.id:
+                    await member.remove_roles(role)
 
-  # 3. Embed Nachricht erstellen
-  embed = discord.Embed(
-      title="🚀 Team-Beförderung (Uprank)",
-      color=discord.Color.green(),
-      timestamp=discord.utils.utcnow(),
-  )
-  embed.add_field(name="User", value=member.mention, inline=False)
-  embed.add_field(name="Neuer Rang / Rolle", value=rolle.mention, inline=False)
-  embed.add_field(name="Neues Kürzel", value=rang_name, inline=True)
-  embed.add_field(name="Grund", value=grund, inline=False)
-  embed.set_footer(text=f"Ausgeführt von {interaction.user.name}")
+        # Neue Rolle zuweisen
+        await member.add_roles(neue_rolle)
 
-  await interaction.response.send_message(embed=embed)
+        # Embed erstellen & im Kanal senden
+        embed = self.create_rank_embed(member, typ, alter_rang_name, neue_rolle)
+        await interaction.response.send_message(embed=embed)
 
+        # Nachricht per Privatnachricht (DM) senden
+        try:
+            await member.send(embed=embed)
+        except discord.Forbidden:
+            pass
 
-# --- DEMOTE / ABSTUFUNG ---
-@bot.tree.command(
-    name="demote", description="Stufe ein Teammitglied herab und passe den Namen an"
-)
-@app_commands.describe(
-    member="Das Teammitglied",
-    neuer_tag="Das neue Kürzel oder '-' (ohne Kürzel)",
-    rolle="Die Rolle, die entfernt oder gewechselt wird",
-    grund="Der Grund für die Degradierung",
-)
-async def demote(
-    interaction: discord.Interaction,
-    member: discord.Member,
-    neuer_tag: str,
-    rolle: discord.Role,
-    grund: str,
-):
-  # 1. Rolle entfernen
-  await member.remove_roles(rolle)
+    # /promote @member @neue_rolle
+    @app_commands.command(name="promote", description="Befördere ein Mitglied auf eine gewählte Rang-Rolle")
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def promote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role):
+        await self._change_rank(interaction, member, neue_rolle, "promote")
 
-  # 2. Nicknamen anpassen (oder zurücksetzen)
-  if neuer_tag.lower() == "keiner" or neuer_tag == "-":
-    neuer_nickname = member.name  # Nur der normale Name
-  else:
-    neuer_nickname = f"{neuer_tag} | {member.name}"
+    # /demote @member @neue_rolle
+    @app_commands.command(name="demote", description="Degradiere ein Mitglied auf eine gewählte Rang-Rolle")
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def demote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role):
+        await self._change_rank(interaction, member, neue_rolle, "demote")
 
-  try:
-    await member.edit(nick=neuer_nickname)
-  except discord.Forbidden:
-    pass
+    # /drang @member @neue_rolle
+    @app_commands.command(name="drang", description="Degradiere ein Mitglied (D-Rang) auf eine gewählte Rang-Rolle")
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def drang(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role):
+        await self._change_rank(interaction, member, neue_rolle, "demote")
 
-  # 3. Embed Nachricht erstellen
-  embed = discord.Embed(
-      title="⚠️ Team-Degradierung (Demote)",
-      color=discord.Color.red(),
-      timestamp=discord.utils.utcnow(),
-  )
-  embed.add_field(name="User", value=member.mention, inline=False)
-  embed.add_field(name="Betroffene Rolle", value=rolle.mention, inline=False)
-  embed.add_field(name="Grund", value=grund, inline=False)
-  embed.set_footer(text=f"Ausgeführt von {interaction.user.name}")
-
-  await interaction.response.send_message(embed=embed)
-
-
-# Bot sicher über Render-Umgebungsvariable starten
-if __name__ == "__main__":
-  bot.run(os.environ["DISCORD_TOKEN"])
+async def setup(bot):
+    await bot.add_cog(RankSystem(bot))
