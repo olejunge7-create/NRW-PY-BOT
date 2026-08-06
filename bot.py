@@ -28,13 +28,17 @@ async def on_ready():
     print("Lade Cogs (Module)...")
 
     try:
-        # Lädt das Rang-System (promote, demote, warn etc.)
+        # Lädt das Rang-System (beförderung, degradierung, warn etc.)
         await bot.load_extension("ranks")
         print("Modul 'ranks' erfolgreich geladen!")
 
-        # Lädt das professionelle Ticket-System
+        # Lädt das Ticket-System
         await bot.load_extension("tickets")
         print("Modul 'tickets' erfolgreich geladen!")
+
+        # Lädt das neue Team-Dashboard
+        await bot.load_extension("daschbord")
+        print("Modul 'daschbord' erfolgreich geladen!")
 
         # --- TRAGE HIER DEINE SERVER-ID EIN (ersetze die 0 durch deine ID) ---
         SERVER_ID = discord.Object(id=1534325338170065128)

@@ -34,10 +34,8 @@ class BewerbungsModal(discord.ui.Modal, title="Bewerbungs-Entscheidung"):
 
         embed.set_footer(text=f"Entscheidung von {interaction.user.name}")
         
-        # Antwort an den Admin senden
         await interaction.response.send_message(f"✅ Bewerbung wurde erfolgreich als **{status_text}** markiert und der User informiert!", ephemeral=True)
         
-        # Versuchen, dem Bewerber eine DM zu schicken
         try:
             await self.member.send(embed=embed)
         except discord.Forbidden:
@@ -54,13 +52,17 @@ class BewerbungsSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        if self.values[0] == "none" or self.values[0] == "placeholder":
+            await interaction.response.send_message("⚠️ Ungültige Auswahl!", ephemeral=True)
+            return
+
         selected_id = int(self.values[0])
         member = interaction.guild.get_member(selected_id)
         if not member:
             await interaction.response.send_message("⚠️ Mitglied nicht gefunden!", ephemeral=True)
             return
 
-        # Öffnet das Pop-up (Modal) für den Grund
+        # Hier wird das Modal direkt geöffnet (ohne vorheriges send_message, um Fehler zu vermeiden)
         await interaction.response.send_modal(BewerbungsModal(self.action_type, member))
 
 class BewerbungsSelectView(discord.ui.View):
@@ -68,9 +70,8 @@ class BewerbungsSelectView(discord.ui.View):
         super().__init__(timeout=60)
         self.select = BewerbungsSelect(action_type)
         
-        # Die letzten 25 Mitglieder des Servers laden (als Beispiel für die Auswahl)
         options = []
-        for member in guild.members[:25]: # Limit auf 25 wegen Discord Dropdown-Limit
+        for member in guild.members[:25]:
             if not member.bot:
                 options.append(discord.SelectOption(label=member.display_name, value=str(member.id)))
         
@@ -96,15 +97,15 @@ class DashboardView(discord.ui.View):
 
     @discord.ui.button(label="⚙️ Info / Hilfe", style=discord.ButtonStyle.secondary, custom_id="dashboard_info", row=1)
     async def info_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("ℹ️ **Team Dashboard Info:**\nNutze die Buttons oben, um Bewerbungen direkt mit einem Klick und einem Grund (Feedback-Fenster) anzunehmen oder abzulehnen.", ephemeral=True)
+        await interaction.response.send_message("ℹ️ **Team Dashboard Info:**\nNutze die Buttons oben, um Bewerbungen direkt mit einem Klick und einem Grund anzunehmen oder abzulehnen.", ephemeral=True)
 
 class DashboardCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="dashboard", description="Öffnet das interaktive Team-Dashboard")
+    @app_commands.command(name="daschbord", description="Öffnet das interaktive Team-Dashboard")
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def dashboard(self, interaction: discord.Interaction):
+    async def daschbord(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="╭━━━━━━━━━━━━━━━━━━━━━━━╮\n🛡️ TEAM DASHBOARD\n╰━━━━━━━━━━━━━━━━━━━━━━━╯",
             description=(
