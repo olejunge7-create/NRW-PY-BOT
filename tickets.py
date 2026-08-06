@@ -1,66 +1,70 @@
 import discord
 from discord.ext import commands
-import asyncio
 
-TEAM_ROLE_IDS = []
+class TicketModal(discord.ui.Modal, title="Support-Ticket erstellen"):
+    reason = discord.ui.TextInput(
+        label="Grund für das Ticket",
+        style=discord.TextStyle.long,
+        placeholder="Beschreibe dein Anliegen kurz...",
+        required=True,
+        max_length=300
+    )
 
-class TicketCloseView(discord.ui.View):
+    async def on_submit(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        category = discord.utils.get(guild.categories, name="Tickets")
+        if not category:
+            category = await guild.create_category("Tickets")
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        }
+
+        channel = await guild.create_text_channel(
+            name=f"ticket-{interaction.user.name}",
+            category=category,
+            overwrites=overwrites
+        )
+
+        embed = discord.Embed(
+            title=f"Support-Ticket von {interaction.user.display_name}",
+            description=f"**Grund:** {self.reason.value}",
+            color=discord.Color.blue()
+        )
+        
+        close_view = CloseTicketView()
+        await channel.send(f"{interaction.user.mention} Dein Ticket wurde erstellt!", embed=embed, view=close_view)
+        await interaction.response.send_message(f"Dein Ticket wurde erstellt: {channel.mention}", ephemeral=True)
+
+class CloseTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="🔒 Ticket schließen", style=discord.ButtonStyle.red, custom_id="persistent_ticket_close_btn")
-    async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🔒 Dieses Ticket wird in wenigen Sekunden gelöscht...", ephemeral=False)
-        await asyncio.sleep(3)
-        try:
-            await interaction.channel.delete()
-        except Exception:
-            pass
+    @discord.ui.button(label="🔒 Ticket schließen", style=discord.ButtonStyle.red, custom_id="close_ticket_button")
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Ticket wird in 5 Sekunden gelöscht...", ephemeral=True)
+        import asyncio
+        await asyncio.sleep(5)
+        await interaction.channel.delete()
 
 class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="🎫 Ticket erstellen", style=discord.ButtonStyle.primary, custom_id="persistent_ticket_create_btn")
-    async def create_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        guild = interaction.guild
-        member = interaction.user
-
-        existing_channel = discord.utils.get(guild.text_channels, name=f"ticket-{member.name.lower()}")
-        if existing_channel:
-            await interaction.response.send_message(f"Du hast bereits ein offenes Ticket: {existing_channel.mention}", ephemeral=True)
-            return
-
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            member: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
-            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
-        }
-
-        for role_id in TEAM_ROLE_IDS:
-            role = guild.get_role(role_id)
-            if role:
-                overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True)
-
-        ticket_channel = await guild.create_text_channel(
-            name=f"ticket-{member.name}",
-            overwrites=overwrites,
-            topic=f"Support-Ticket von {member.name} (ID: {member.id})"
-        )
-
-        embed = discord.Embed(
-            title=f"Support-Ticket | {member.display_name}",
-            description="Willkommen im Support! Ein Teammitglied wird sich gleich um dich kümmern.\nKlicke auf den Button unten, um das Ticket zu schließen.",
-            color=discord.Color.blue()
-        )
-        
-        await interaction.response.send_message(f"Dein Ticket wurde erstellt: {ticket_channel.mention}", ephemeral=True)
-        await ticket_channel.send(content=f"{member.mention}", embed=embed, view=TicketCloseView())
+    @discord.ui.button(label="🎫 Ticket öffnen", style=discord.ButtonStyle.green, custom_id="open_ticket_button")
+    async def open_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(TicketModal())
 
 class TicketCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def cog_load(self):
+        # Registriert die Views permanent, damit Buttons nach Neustarts aktiv bleiben
+        self.bot.add_view(TicketView())
+        self.bot.add_view(CloseTicketView())
+
 async def setup(bot):
     await bot.add_cog(TicketCog(bot))
-

@@ -11,8 +11,8 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Alle Cogs (Tickets, Bewerbung, Warn-System) automatisch laden
-        extensions = ["tickets", "bewerbung", "warn"]
+        # Alle Cogs (Tickets, Bewerbung, Warn-System und Ranks) automatisch laden
+        extensions = ["tickets", "bewerbung", "warn", "ranks"]
         for ext in extensions:
             try:
                 await self.load_extension(ext)
@@ -30,7 +30,7 @@ bot = MyBot()
 async def on_ready():
     print(f"Eingeloggt als {bot.user}!")
 
-# Echter Slash-Befehl: /setup_panels
+# Slash-Befehl zum Erstellen der Panels im Kanal
 @bot.tree.command(name="setup_panels", description="Sendet die Ticket- und Bewerbungs-Panels in den aktuellen Kanal.")
 @discord.app_commands.checks.has_permissions(administrator=True)
 async def setup_panels(interaction: discord.Interaction):

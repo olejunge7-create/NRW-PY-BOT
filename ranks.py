@@ -1,11 +1,7 @@
-import json
-import os
 import discord
-from discord import app_commands
 from discord.ext import commands
 
-WARNS_FILE = "warns.json"
-
+# Deine festen Rollen-IDs von Rang 1 bis 21
 RANK_ROLES = [
     1534325338182520991,  # Rang 1
     1534325338182520992,  # Rang 2
@@ -28,139 +24,80 @@ RANK_ROLES = [
     1534325338212007984,  # Rang 19
     1534325338212007985,  # Rang 20
     1534325338212007986,  # Rang 21
-    1534325338170065136   # Zusätzliche Team-Rolle
 ]
 
-def load_warns():
-    if not os.path.exists(WARNS_FILE):
-        return {}
-    try:
-        with open(WARNS_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def save_warns(data):
-    with open(WARNS_FILE, "w") as f:
-        json.dump(data, f, indent=4)
-
-class RankSystem(commands.Cog):
+class RanksCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def create_rank_embed(self, member: discord.Member, typ: str, alter_rang: str, neue_rolle: discord.Role, grund: str, ausfuehrer: discord.Member) -> discord.Embed:
-        if typ == "promote":
-            title_text = "📈 **Beförderung**"
-            desc_text = "🎉 Herzlichen Glückwunsch! Aufgrund deiner Aktivität und deines Engagements wurdest du befördert.\nViel Erfolg in deiner neuen Position! 🚀"
-            color = discord.Color.green()
+    @discord.app_commands.command(name="uprank", description="Stuft einen Benutzer automatisch in den nächsten Rang hoch.")
+    @discord.app_commands.describe(member="Der Benutzer, der hochgestuft werden soll")
+    @discord.app_commands.checks.has_permissions(manage_roles=True)
+    async def uprank(self, interaction: discord.Interaction, member: discord.Member):
+        guild = interaction.guild
+        user_roles = [r.id for r in member.roles]
+
+        # Finde heraus, welchen aktuellen Rang aus der Liste der User hat
+        current_rank_idx = -1
+        for i, role_id in enumerate(RANK_ROLES):
+            if role_id in user_roles:
+                current_rank_idx = i
+
+        # Wenn der User noch keinen Rang hat, geben wir ihm Rang 1
+        if current_rank_idx == -1:
+            next_role_id = RANK_ROLES[0]
+        elif current_rank_idx < len(RANK_ROLES) - 1:
+            # Nächsten Rang nehmen
+            next_role_id = RANK_ROLES[current_rank_idx + 1]
         else:
-            title_text = "📉 **Degradierung**"
-            desc_text = "⚠️ Dein Rang auf dem Server wurde angepasst.\nWir hoffen, dich bald wieder oben zu sehen!"
-            color = discord.Color.red()
-
-        embed = discord.Embed(
-            title="╭━━━━━━━━━━━━━━━━━━━━━━━╮\n📢 RANGÄNDERUNG\n╰━━━━━━━━━━━━━━━━━━━━━━━╯",
-            description=(
-                f"👤 **Mitglied:** {member.mention}\n"
-                f"{title_text}\n\n"
-                f"**Alter Rang:** {alter_rang}\n"
-                f"➡️ **Neuer Rang:** {neue_rolle.name}\n"
-                f"📝 **Grund:** {grund}\n"
-                f"🛡️ **Durchgeführt von:** {ausfuehrer.mention}\n\n"
-                f"{desc_text}"
-            ),
-            color=color
-        )
-        embed.set_footer(text="🤖 System")
-        return embed
-
-    async def _change_rank(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str, typ: str):
-        if neue_rolle.id not in RANK_ROLES:
-            await interaction.response.send_message("⚠️ Die angegebene Rolle ist keine gültige Rang-Rolle!", ephemeral=True)
+            await interaction.response.send_message(f"❌ {member.mention} hat bereits den höchsten Rang (Rang 21) erreicht!", ephemeral=True)
             return
 
-        alter_rang_name = "Kein Rang"
-        for role in member.roles:
-            if role.id in RANK_ROLES:
-                alter_rang_name = role.name
-                if role.id != neue_rolle.id:
-                    await member.remove_roles(role)
-
-        await member.add_roles(neue_rolle)
-
-        embed = self.create_rank_embed(member, typ, alter_rang_name, neue_rolle, grund, interaction.user)
-        await interaction.response.send_message(embed=embed)
+        next_role = guild.get_role(next_role_id)
+        if not next_role:
+            await interaction.response.send_message("❌ Fehler: Die Rollen-ID wurde auf diesem Server nicht gefunden.", ephemeral=True)
+            return
 
         try:
-            await member.send(embed=embed)
+            # Alten Rang entfernen (falls vorhanden) und neuen geben
+            if current_rank_idx != -1:
+                old_role = guild.get_role(RANK_ROLES[current_rank_idx])
+                if old_role and old_role in member.roles:
+                    await member.remove_roles(old_role)
+
+            await member.add_roles(next_role)
+            await interaction.response.send_message(f"✅ {member.mention} wurde erfolgreich auf **{next_role.name}** hochgestuft!", ephemeral=True)
         except discord.Forbidden:
-            pass
+            await interaction.response.send_message("❌ Mir fehlen die Berechtigungen, diese Rollen zu ändern (Bot-Rolle muss höher stehen).", ephemeral=True)
 
-    @app_commands.command(name="beförderung", description="Befördere ein Mitglied auf eine gewählte Rang-Rolle")
-    @app_commands.checks.has_permissions(manage_roles=True)
-    async def beförderung(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
-        await self._change_rank(interaction, member, neue_rolle, grund, "promote")
+    @discord.app_commands.command(name="downrank", description="Stuft einen Benutzer einen Rang herunter.")
+    @discord.app_commands.describe(member="Der Benutzer, der herabgestuft werden soll")
+    @discord.app_commands.checks.has_permissions(manage_roles=True)
+    async def downrank(self, interaction: discord.Interaction, member: discord.Member):
+        guild = interaction.guild
+        user_roles = [r.id for r in member.roles]
 
-    @app_commands.command(name="degradierung", description="Degradiere ein Mitglied auf eine gewählte Rang-Rolle")
-    @app_commands.checks.has_permissions(manage_roles=True)
-    async def degradierung(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
-        await self._change_rank(interaction, member, neue_rolle, grund, "demote")
+        current_rank_idx = -1
+        for i, role_id in enumerate(RANK_ROLES):
+            if role_id in user_roles:
+                current_rank_idx = i
 
-    @app_commands.command(name="warn", description="Verwarne ein Mitglied auf dem Server")
-    @app_commands.checks.has_permissions(manage_messages=True)
-    async def warn(self, interaction: discord.Interaction, member: discord.Member, grund: str):
-        warns_data = load_warns()
-        user_id_str = str(member.id)
+        if current_rank_idx <= 0:
+            await interaction.response.send_message(f"❌ {member.mention} hat keinen abstufbaren Rang mehr.", ephemeral=True)
+            return
 
-        if user_id_str not in warns_data:
-            warns_data[user_id_str] = 0
-        
-        warns_data[user_id_str] += 1
-        current_warns = warns_data[user_id_str]
-
-        team_action_text = ""
-
-        if current_warns >= 3:
-            removed_roles_count = 0
-            for role_id in RANK_ROLES:
-                role = interaction.guild.get_role(role_id)
-                if role and role in member.roles:
-                    try:
-                        await member.remove_roles(role)
-                        removed_roles_count += 1
-                    except:
-                        pass
-            
-            if removed_roles_count > 0:
-                team_action_text = f"\n\n🚨 **3 Warns erreicht: {removed_roles_count} Team-/Rang-Rolle(n) wurden entzogen & Warns zurückgesetzt!**"
-            else:
-                team_action_text = "\n\n🚨 **3 Warns erreicht: Warns wurden zurückgesetzt!**"
-            
-            warns_data[user_id_str] = 0
-            current_warns = 0
-
-        save_warns(warns_data)
-
-        embed = discord.Embed(
-            title="╭━━━━━━━━━━━━━━━━━━━━━━━╮\n⚠️ VERWARNUNG\n╰━━━━━━━━━━━━━━━━━━━━━━━╯",
-            description=(
-                f"👤 **Mitglied:** {member.mention}\n"
-                f"📝 **Grund:** {grund}\n"
-                f"📊 **Aktuelle Warns:** {current_warns} / 3\n"
-                f"🛡️ **Verwarnt von:** {interaction.user.mention}\n"
-                f"{team_action_text}\n\n"
-                f"Bitte halte dich an die Serverregeln, um weitere Sanktionen zu vermeiden."
-            ),
-            color=discord.Color.orange()
-        )
-        embed.set_footer(text="🤖 Moderation System")
-
-        await interaction.response.send_message(embed=embed)
+        old_role = guild.get_role(RANK_ROLES[current_rank_idx])
+        prev_role = guild.get_role(RANK_ROLES[current_rank_idx - 1])
 
         try:
-            await member.send(embed=embed)
+            if old_role in member.roles:
+                await member.remove_roles(old_role)
+            if prev_role:
+                await member.add_roles(prev_role)
+
+            await interaction.response.send_message(f"✅ {member.mention} wurde auf **{prev_role.name if prev_role else 'den vorherigen Rang'}** herabgestuft.", ephemeral=True)
         except discord.Forbidden:
-            pass
+            await interaction.response.send_message("❌ Mir fehlen die Berechtigungen, diese Rollen zu ändern.", ephemeral=True)
 
 async def setup(bot):
-    await bot.add_cog(RankSystem(bot))
+    await bot.add_cog(RanksCog(bot))
