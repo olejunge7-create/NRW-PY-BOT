@@ -11,22 +11,18 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Cogs laden
-        try:
-            await self.load_extension("tickets")
-            print("Ticket-System geladen!")
-        except Exception as e:
-            print(f"Fehler beim Laden von tickets: {e}")
+        # Alle Cogs (Tickets, Bewerbung, Warn-System) automatisch laden
+        extensions = ["tickets", "bewerbung", "warn"]
+        for ext in extensions:
+            try:
+                await self.load_extension(ext)
+                print(f"{ext}-System erfolgreich geladen!")
+            except Exception as e:
+                print(f"Fehler beim Laden von {ext}: {e}")
 
-        try:
-            await self.load_extension("bewerbung")
-            print("Bewerbungs-System geladen!")
-        except Exception as e:
-            print(f"Fehler beim Laden von bewerbung: {e}")
-
-        # Slash-Befehle global synchronisieren, damit /setup_panels sofort verfügbar ist
+        # Slash-Befehle global synchronisieren
         await self.tree.sync()
-        print("Slash-Befehle synchronisiert!")
+        print("Slash-Befehle erfolgreich synchronisiert!")
 
 bot = MyBot()
 
