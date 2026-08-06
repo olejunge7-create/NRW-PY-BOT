@@ -1,6 +1,12 @@
+import json
+import os
 import discord
 from discord import app_commands
 from discord.ext import commands
+
+# Dateipfad zum Speichern der Warnungen
+WARNS_FILE = "warns.json"
+TEAM_ROLE_ID = 1534325338170065136
 
 # Alle 21 Rollen-IDs des Rang-Systems
 RANK_ROLES = [
@@ -26,6 +32,19 @@ RANK_ROLES = [
     1534325338212007985,  # Rang 20
     1534325338212007986   # Rang 21
 ]
+
+def load_warns():
+    if not os.path.exists(WARNS_FILE):
+        return {}
+    try:
+        with open(WARNS_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_warns(data):
+    with open(WARNS_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
 class RankSystem(commands.Cog):
     def __init__(self, bot):
@@ -62,7 +81,6 @@ class RankSystem(commands.Cog):
             await interaction.response.send_message("⚠️ Die angegebene Rolle ist keine gültige Rang-Rolle!", ephemeral=True)
             return
 
-        # Alter Rang ermitteln und alte Rang-Rollen entfernen
         alter_rang_name = "Kein Rang"
         for role in member.roles:
             if role.id in RANK_ROLES:
@@ -70,52 +88,70 @@ class RankSystem(commands.Cog):
                 if role.id != neue_rolle.id:
                     await member.remove_roles(role)
 
-        # Neue Rolle zuweisen
         await member.add_roles(neue_rolle)
 
-        # Embed erstellen & im Kanal senden
         embed = self.create_rank_embed(member, typ, alter_rang_name, neue_rolle, grund, interaction.user)
         await interaction.response.send_message(embed=embed)
 
-        # Nachricht per Privatnachricht (DM) senden
         try:
             await member.send(embed=embed)
         except discord.Forbidden:
             pass
 
-    # Vorübergehend umbenannt zu /befoerdern, um den Discord-Cache zu zwingen
-    @app_commands.command(name="befoerdern", description="Befördere ein Mitglied auf eine gewählte Rang-Rolle")
+    @app_commands.command(name="promote", description="Befördere ein Mitglied auf eine gewählte Rang-Rolle")
     @app_commands.checks.has_permissions(manage_roles=True)
-    async def befoerdern(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
+    async def promote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
         await self._change_rank(interaction, member, neue_rolle, grund, "promote")
 
-    # /demote @member @neue_rolle grund
     @app_commands.command(name="demote", description="Degradiere ein Mitglied auf eine gewählte Rang-Rolle")
     @app_commands.checks.has_permissions(manage_roles=True)
     async def demote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
         await self._change_rank(interaction, member, neue_rolle, grund, "demote")
 
-    # /drang @member @neue_rolle grund
     @app_commands.command(name="drang", description="Degradiere ein Mitglied (D-Rang) auf eine gewählte Rang-Rolle")
     @app_commands.checks.has_permissions(manage_roles=True)
     async def drang(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
         await self._change_rank(interaction, member, neue_rolle, grund, "demote")
 
-    # /warn @member grund
     @app_commands.command(name="warn", description="Verwarne ein Mitglied auf dem Server")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def warn(self, interaction: discord.Interaction, member: discord.Member, grund: str):
+        warns_data = load_warns()
+        user_id_str = str(member.id)
+
+        # Warnung zählen
+        if user_id_str not in warns_data:
+            warns_data[user_id_str] = 0
+        
+        warns_data[user_id_str] += 1
+        current_warns = warns_data[user_id_str]
+        save_warns(warns_data)
+
         embed = discord.Embed(
             title="╭━━━━━━━━━━━━━━━━━━━━━━━╮\n⚠️ VERWARNUNG\n╰━━━━━━━━━━━━━━━━━━━━━━━╯",
             description=(
                 f"👤 **Mitglied:** {member.mention}\n"
                 f"📝 **Grund:** {grund}\n"
+                f"📊 **Aktuelle Warns:** {current_warns} / 3\n"
                 f"🛡️ **Verwarnt von:** {interaction.user.mention}\n\n"
                 f"Bitte halte dich an die Serverregeln, um weitere Sanktionen zu vermeiden."
             ),
             color=discord.Color.orange()
         )
         embed.set_footer(text="🤖 Moderation System")
+
+        team_removed_text = ""
+        # Prüfen ob 3 Warns erreicht wurden
+        if current_warns >= 3:
+            team_role = interaction.guild.get_role(TEAM_ROLE_ID)
+            if team_role and team_role in member.roles:
+                try:
+                    await member.remove_roles(team_role)
+                    team_removed_text = "\n\n🚨 **Da 3 Warnungen erreicht wurden, wurde dem Mitglied die Team-Rolle entzogen!**"
+                except:
+                    pass
+
+        embed.description += team_removed_text
 
         await interaction.response.send_message(embed=embed)
 
