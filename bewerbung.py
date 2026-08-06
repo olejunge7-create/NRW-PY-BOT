@@ -1,9 +1,10 @@
 import discord
 from discord.ext import commands
+import asyncio
 
-# Liste der 20 Fragen
+# Die 20 Fragen
 QUESTIONS = [
-    "1. Wie ist dein Name?",
+    "1. Wie ist dein Vorname?",
     "2. Wie alt bist du?",
     "3. Was ist deine genaue Discord-ID (Name#Tag)?",
     "4. Seit wann spielst du auf unserem Server?",
@@ -25,36 +26,51 @@ QUESTIONS = [
     "20. Warum sollten wir gerade DICH wählen?"
 ]
 
-class BewerbungsModal(discord.ui.Modal, title="Ausführliche Teambewerbung"):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.inputs = []
-        # Da ein Modal maximal 5 TextInputs haben darf, müssen wir das anders lösen.
-        # Lösung: User bekommt die Fragen per DM geschickt.
-        # Hier triggern wir den Prozess.
-
-    async def on_submit(self, interaction: discord.Interaction):
-        pass # Nicht genutzt, da wir DMs nutzen
-
 class BewerbungView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="📝 Jetzt Bewerben (Start per DM)", style=discord.ButtonStyle.primary, custom_id="persistent_bewerbung_start_btn")
+    @discord.ui.button(label="📝 Jetzt Bewerben", style=discord.ButtonStyle.primary, custom_id="persistent_bewerbung_start_btn")
     async def apply_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("✅ Bitte schaue in deine DMs (Direktnachrichten)!", ephemeral=True)
-        
+        user = interaction.user
+        await interaction.response.send_message("✅ Schaue bitte in deine **Direktnachrichten (DMs)**! Die Bewerbung beginnt jetzt.", ephemeral=True)
+
         try:
-            # DM an den User
-            await interaction.user.send("Hallo! Um dich zu bewerben, beantworte bitte die folgenden 20 Fragen. Antworte einfach nacheinander auf jede Nachricht, die ich dir sende.")
-            
-            # Hier müsste man eigentlich einen komplexen Listener bauen. 
-            # Zur Vereinfachung schicken wir alle Fragen auf einmal oder führen den User durch.
-            questions_text = "\n\n".join(QUESTIONS)
-            await interaction.user.send(f"Hier sind die Fragen:\n\n{questions_text}\n\nBitte kopiere diese Liste, fülle sie aus und sende sie mir zurück.")
-            
+            dm_channel = await user.create_dm()
         except discord.Forbidden:
-            await interaction.followup.send("❌ Ich konnte dir keine Nachricht senden. Bitte aktiviere DMs von Servermitgliedern!", ephemeral=True)
+            return
+
+        answers = []
+        
+        await dm_channel.send("👋 Hallo! Schön, dass du dich bewirbst. Ich stelle dir jetzt **20 Fragen nacheinander**.\nAntworte einfach auf jede Frage, die ich dir schicke.\n\n**Los geht's mit Frage 1:**")
+
+        for i, question in enumerate(QUESTIONS):
+            await dm_channel.send(f"**Frage {i+1} von 20:**\n{question}")
+
+            def check(m):
+                return m.author == user and isinstance(m.channel, discord.DMChannel)
+
+            try:
+                msg = await interaction.client.wait_for('message', check=check, timeout=300.0)
+                answers.append(msg.content)
+            except asyncio.TimeoutError:
+                await dm_channel.send("❌ Die Bewerbung wurde abgebrochen, da du zu lange (über 5 Minuten) nicht geantwortet hast.")
+                return
+
+        await dm_channel.send("🎉 **Vielen Dank!** Deine Bewerbung wurde komplett ausgefüllt und an das Team weitergeleitet.")
+
+        admin_channel = interaction.client.get_channel(1534552376911073451)
+        if admin_channel:
+            embed = discord.Embed(
+                title=f"📄 Neue Bewerbung: {user.display_name}",
+                color=discord.Color.gold()
+            )
+            embed.set_thumbnail(url=user.display_avatar.url)
+            
+            for i in range(len(QUESTIONS)):
+                embed.add_field(name=QUESTIONS[i], value=answers[i] if answers[i] else "Keine Antwort", inline=False)
+            
+            await admin_channel.send(embed=embed)
 
 class BewerbungCog(commands.Cog):
     def __init__(self, bot):
