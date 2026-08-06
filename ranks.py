@@ -29,7 +29,7 @@ RANK_ROLES = [
     1534325338212007984,  # Rang 19
     1534325338212007985,  # Rang 20
     1534325338212007986,  # Rang 21
-    1534325338170065136   # Die zusätzliche Team-Rolle (falls gewünscht)
+    1534325338182520990   # Die zusätzliche Team-Rolle (falls gewünscht)
 ]
 
 def load_warns():
