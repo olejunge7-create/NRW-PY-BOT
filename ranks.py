@@ -4,11 +4,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# Dateipfad zum Speichern der Warnungen
 WARNS_FILE = "warns.json"
 TEAM_ROLE_ID = 1534325338170065136
 
-# Alle 21 Rollen-IDs des Rang-Systems
 RANK_ROLES = [
     1534325338182520991,  # Rang 1
     1534325338182520992,  # Rang 2
@@ -124,6 +122,23 @@ class RankSystem(commands.Cog):
         
         warns_data[user_id_str] += 1
         current_warns = warns_data[user_id_str]
+
+        team_action_text = ""
+
+        # Wenn 3 Warns erreicht sind -> Rolle weg und Warns resetten
+        if current_warns >= 3:
+            team_role = interaction.guild.get_role(TEAM_ROLE_ID)
+            if team_role:
+                try:
+                    await member.remove_roles(team_role)
+                    team_action_text = "\n\n🚨 **3 Warns erreicht: Team-Rolle wurde entzogen & Warns wurden zurückgesetzt!**"
+                except Exception as e:
+                    team_action_text = f"\n\n⚠️ *Konnte Team-Rolle nicht entfernen (Fehler: {e})*"
+            
+            # Warns wieder auf 0 setzen
+            warns_data[user_id_str] = 0
+            current_warns = 0
+
         save_warns(warns_data)
 
         embed = discord.Embed(
@@ -132,21 +147,13 @@ class RankSystem(commands.Cog):
                 f"👤 **Mitglied:** {member.mention}\n"
                 f"📝 **Grund:** {grund}\n"
                 f"📊 **Aktuelle Warns:** {current_warns} / 3\n"
-                f"🛡️ **Verwarnt von:** {interaction.user.mention}\n\n"
+                f"🛡️ **Verwarnt von:** {interaction.user.mention}\n"
+                f"{team_action_text}\n\n"
                 f"Bitte halte dich an die Serverregeln, um weitere Sanktionen zu vermeiden."
             ),
             color=discord.Color.orange()
         )
         embed.set_footer(text="🤖 Moderation System")
-
-        # Prüfen ob 3 Warns erreicht wurden und Rolle entziehen
-        if current_warns >= 3:
-            team_role = interaction.guild.get_role(TEAM_ROLE_ID)
-            if team_role:
-                try:
-                    await member.remove_roles(team_role)
-                except Exception as e:
-                    print(f"Konnte Team-Rolle nicht entfernen: {e}")
 
         await interaction.response.send_message(embed=embed)
 
