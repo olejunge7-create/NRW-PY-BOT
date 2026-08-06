@@ -4,18 +4,17 @@ import os
 from flask import Flask
 import threading
 
-# Flask-App für Render (damit der Port offen ist)
+# Flask-Server damit Render denkt, es ist ein Web Service mit offenem Port
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is running!"
+    return "Bot is online!"
 
 def run_flask():
     port = int(os.getenv("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# Discord Bot Setup
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -53,7 +52,7 @@ async def setup_panels(interaction: discord.Interaction):
     await interaction.channel.send("📝 **Team-Bewerbung**\nKlicke auf den Button unten, um dich zu bewerben:", view=BewerbungView())
 
 if __name__ == "__main__":
-    # Flask in einem separaten Thread starten, damit der Bot und der Webserver gleichzeitig laufen
+    # Flask-Server im Hintergrund starten
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
