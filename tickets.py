@@ -18,14 +18,14 @@ class TicketCloseView(discord.ui.View):
 
 class TicketView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None) # Wichtig für die Persistenz bei Neustarts
+        super().__init__(timeout=None) # Bleibt nach Neustarts aktiv
 
     @discord.ui.button(label="🎫 Ticket erstellen", style=discord.ButtonStyle.primary, custom_id="persistent_ticket_create_btn")
     async def create_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
         member = interaction.user
 
-        # Überprüfen, ob der User bereits ein offenes Ticket hat
+        # Prüfen, ob der User bereits ein offenes Ticket hat
         existing_channel = discord.utils.get(guild.text_channels, name=f"ticket-{member.name.lower()}")
         if existing_channel:
             await interaction.response.send_message(f"Du hast bereits ein offenes Ticket: {existing_channel.mention}", ephemeral=True)
@@ -45,7 +45,7 @@ class TicketView(discord.ui.View):
             topic=f"Support-Ticket von {member.name} (ID: {member.id})"
         )
 
-        # Willkommensnachricht im Ticket mit Schließen-Button
+        # Willkommensnachricht im Ticket
         embed = discord.Embed(
             title=f"Support-Ticket | {member.display_name}",
             description="Willkommen im Support! Ein Teammitglied wird sich gleich um dich kümmern.\nKlicke auf den Button unten, um das Ticket zu schließen.",

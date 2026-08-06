@@ -3,11 +3,9 @@ import os
 import discord
 from discord.ext import commands
 from flask import Flask
-# Importiere Dashboard (Admin) UND UserApplyView (User) aus dashboard.py
-from dashboard import DashboardView, UserApplyView
 from tickets import TicketView
 
-# --- FLASK WEB SERVER (Für Render) ---
+# --- FLASK WEB SERVER ---
 app = Flask(__name__)
 
 @app.route("/")
@@ -31,62 +29,42 @@ async def on_ready():
     print("Lade Cogs (Module)...")
 
     try:
+        # Lade deine Module (Dashboard ist komplett raus)
         await bot.load_extension("ranks")
-        await bot.load_extension("tickets")
-        await bot.load_extension("dashboard")
-        print("Alle Module geladen!")
+        print("Modul 'ranks' geladen!")
 
+        await bot.load_extension("tickets")
+        print("Modul 'tickets' geladen!")
+
+        # Befehle synchronisieren
         SERVER_ID = discord.Object(id=1534325338170065128)
         bot.tree.copy_global_to(guild=SERVER_ID)
         await bot.tree.sync(guild=SERVER_ID)
         print("Befehle synchronisiert!")
 
-        # --- 1. USER: BEWERBUNG (1534579610497581180) ---
-        CHANNEL_USER_BEWERBEN = 1534579610497581180
-        chan_user = bot.get_channel(CHANNEL_USER_BEWERBEN)
-        if chan_user:
-            try: await chan_user.purge(limit=10)
-            except: pass
-            
-            embed_user = discord.Embed(
-                title="👋 Werde Teil unseres Teams!",
-                description="Klicke auf den Button unten, um das Bewerbungsformular zu öffnen. Fülle alle Felder wahrheitsgemäß aus.",
-                color=discord.Color.gold()
-            )
-            embed_user.set_footer(text="Wir freuen uns auf dich!")
-            await chan_user.send(embed=embed_user, view=UserApplyView())
-
-        # --- 2. ADMIN: DASHBOARD (1534552376911073451) ---
-        CHANNEL_ADMIN_DASHBOARD = 1534552376911073451
-        chan_admin = bot.get_channel(CHANNEL_ADMIN_DASHBOARD)
-        if chan_admin:
-            try: await chan_admin.purge(limit=10)
-            except: pass
-            
-            embed_dash = discord.Embed(
-                title="🛡️ TEAM DASHBOARD",
-                description="Hier landen neue Bewerbungen. Mit den Buttons kannst du diese annehmen oder ablehnen.",
-                color=discord.Color.blurple()
-            )
-            embed_dash.set_footer(text="System Dashboard")
-            await chan_admin.send(embed=embed_dash, view=DashboardView())
-
-        # --- 3. USER: TICKETS (1534325339369635991) ---
+        # --- Ticket-Kanal beim Start aufräumen & neu posten ---
         CHANNEL_TICKETS = 1534325339369635991
         chan_tick = bot.get_channel(CHANNEL_TICKETS)
         if chan_tick:
-            try: await chan_tick.purge(limit=10)
-            except: pass
+            try:
+                # Löscht alte Nachrichten im Ticket-Kanal beim Start
+                await chan_tick.purge(limit=10)
+                print("Alte Ticket-Nachrichten gelöscht.")
+            except Exception as e:
+                print(f"Konnte Nachrichten nicht löschen: {e}")
             
+            # Frisches Ticket-Panel posten
             embed_tick = discord.Embed(
                 title="🎫 TICKET SUPPORT",
-                description="Klicke auf den Button, um ein Support-Ticket zu öffnen.",
+                description="Klicke auf den unten stehenden Button, um ein Support-Ticket zu öffnen.",
                 color=discord.Color.blue()
             )
+            embed_tick.set_footer(text="🤖 Ticket System")
             await chan_tick.send(embed=embed_tick, view=TicketView())
+            print("Frisches Ticket-Panel im Kanal gepostet!")
 
     except Exception as e:
-        print(f"Fehler: {e}")
+        print(f"Fehler beim Start: {e}")
 
     print("Bot ist vollständig bereit!")
 
@@ -100,4 +78,4 @@ if __name__ == "__main__":
     try:
         bot.run(TOKEN)
     except Exception as e:
-        print(f"Fehler beim Start: {e}")
+        print(f"Fehler beim Starten des Bots: {e}")
