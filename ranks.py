@@ -83,10 +83,10 @@ class RankSystem(commands.Cog):
         except discord.Forbidden:
             pass
 
-    # /promote @member @neue_rolle grund
-    @app_commands.command(name="promote", description="Befördere ein Mitglied auf eine gewählte Rang-Rolle")
+    # Vorübergehend umbenannt zu /befoerdern, um den Discord-Cache zu zwingen
+    @app_commands.command(name="befoerdern", description="Befördere ein Mitglied auf eine gewählte Rang-Rolle")
     @app_commands.checks.has_permissions(manage_roles=True)
-    async def promote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
+    async def befoerdern(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
         await self._change_rank(interaction, member, neue_rolle, grund, "promote")
 
     # /demote @member @neue_rolle grund
@@ -101,7 +101,7 @@ class RankSystem(commands.Cog):
     async def drang(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
         await self._change_rank(interaction, member, neue_rolle, grund, "demote")
 
-    # NEU: /warn @member grund
+    # /warn @member grund
     @app_commands.command(name="warn", description="Verwarne ein Mitglied auf dem Server")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def warn(self, interaction: discord.Interaction, member: discord.Member, grund: str):
@@ -117,10 +117,8 @@ class RankSystem(commands.Cog):
         )
         embed.set_footer(text="🤖 Moderation System")
 
-        # Im Kanal antworten
         await interaction.response.send_message(embed=embed)
 
-        # Dem User zusätzlich per DM schicken
         try:
             await member.send(embed=embed)
         except discord.Forbidden:
