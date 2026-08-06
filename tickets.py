@@ -33,45 +33,45 @@ class BewerbungView(discord.ui.View):
     @discord.ui.button(label="📝 Jetzt Bewerben", style=discord.ButtonStyle.primary, custom_id="persistent_bewerbung_start_btn")
     async def apply_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         user = interaction.user
-        await interaction.response.send_message("✅ Schaue bitte in deine **Direktnachrichten (DMs)**! Die Bewerbung hat dort begonnen.", ephemeral=True)
+        await interaction.response.send_message("✅ Schaue bitte in deine **Direktnachrichten (DMs)**! Die Bewerbung beginnt jetzt.", ephemeral=True)
 
         try:
             dm_channel = await user.create_dm()
         except discord.Forbidden:
             return
 
-        await dm_channel.send("👋 Hallo! Schön, dass du dich bewirbst. Ich stelle dir jetzt **20 Fragen nacheinander**. Antworte einfach auf jede Nachricht.\n\n**Frage 1 geht los:**")
-
         answers = []
         
-        # Geht jede Frage einzeln durch
+        await dm_channel.send("👋 Hallo! Schön, dass du dich bewirbst. Ich stelle dir jetzt **20 Fragen nacheinander**.\nAntworte einfach auf jede Frage, die ich dir schicke.\n\n**Los geht's mit Frage 1:**")
+
+        # Geht jede Frage einzeln nacheinander durch
         for i, question in enumerate(QUESTIONS):
-            await dm_channel.send(f"**[{i+1}/20]** {question}")
+            # Schickt die aktuelle Frage
+            await dm_channel.send(f"**Frage {i+1} von 20:**\n{question}")
 
             def check(m):
                 return m.author == user and isinstance(m.channel, discord.DMChannel)
 
             try:
-                # Wartet auf die Antwort des Users (max. 5 Minuten pro Frage)
+                # WARTET exakt auf die nächste Nachricht des Users und bricht die Schleife nicht ab
                 msg = await interaction.client.wait_for('message', check=check, timeout=300.0)
                 answers.append(msg.content)
             except asyncio.TimeoutError:
-                await dm_channel.send("❌ Die Bewerbung wurde abgebrochen, da du zu lange nicht geantwortet hast.")
+                await dm_channel.send("❌ Die Bewerbung wurde abgebrochen, da du zu lange (über 5 Minuten) nicht geantwortet hast.")
                 return
 
-        # Wenn alle Fragen beantwortet wurden
-        await dm_channel.send("🎉 **Vielen Dank!** Deine Bewerbung wurde erfolgreich abgesendet und an das Team weitergeleitet.")
+        # Wenn alle Fragen beantwortet sind
+        await dm_channel.send("🎉 **Vielen Dank!** Deine Bewerbung wurde komplett ausgefüllt und an das Team weitergeleitet.")
 
-        # Bewerbung in den Admin-/Auswertungskanal senden (Kanal-ID: 1534552376911073451)
+        # Alles in den Admin-/Auswertungskanal senden (ID: 1534552376911073451)
         admin_channel = interaction.client.get_channel(1534552376911073451)
         if admin_channel:
             embed = discord.Embed(
-                title=f"📄 Neue Bewerbung von {user.display_name}",
+                title=f"📄 Neue Bewerbung: {user.display_name}",
                 color=discord.Color.gold()
             )
             embed.set_thumbnail(url=user.display_avatar.url)
             
-            # Fügt alle Fragen und Antworten übersichtlich ins Embed ein
             for i in range(len(QUESTIONS)):
                 q_text = QUESTIONS[i]
                 a_text = answers[i]
