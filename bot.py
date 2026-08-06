@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 from flask import Flask
 from tickets import TicketView
+from bewerbung import BewerbungView
 
 # --- FLASK WEB SERVER ---
 app = Flask(__name__)
@@ -29,12 +30,10 @@ async def on_ready():
     print("Lade Cogs (Module)...")
 
     try:
-        # Lade deine Module (Dashboard ist komplett raus)
-        await bot.load_extension("ranks")
-        print("Modul 'ranks' geladen!")
-
+        # Module laden
         await bot.load_extension("tickets")
-        print("Modul 'tickets' geladen!")
+        await bot.load_extension("bewerbung")
+        print("Modul 'tickets' & 'bewerbung' geladen!")
 
         # Befehle synchronisieren
         SERVER_ID = discord.Object(id=1534325338170065128)
@@ -42,18 +41,15 @@ async def on_ready():
         await bot.tree.sync(guild=SERVER_ID)
         print("Befehle synchronisiert!")
 
-        # --- Ticket-Kanal beim Start aufräumen & neu posten ---
+        # --- 1. Ticket-Kanal aufräumen & neu posten ---
         CHANNEL_TICKETS = 1534325339369635991
         chan_tick = bot.get_channel(CHANNEL_TICKETS)
         if chan_tick:
             try:
-                # Löscht alte Nachrichten im Ticket-Kanal beim Start
                 await chan_tick.purge(limit=10)
-                print("Alte Ticket-Nachrichten gelöscht.")
-            except Exception as e:
-                print(f"Konnte Nachrichten nicht löschen: {e}")
+            except Exception:
+                pass
             
-            # Frisches Ticket-Panel posten
             embed_tick = discord.Embed(
                 title="🎫 TICKET SUPPORT",
                 description="Klicke auf den unten stehenden Button, um ein Support-Ticket zu öffnen.",
@@ -61,7 +57,23 @@ async def on_ready():
             )
             embed_tick.set_footer(text="🤖 Ticket System")
             await chan_tick.send(embed=embed_tick, view=TicketView())
-            print("Frisches Ticket-Panel im Kanal gepostet!")
+
+        # --- 2. Bewerbungs-Kanal aufräumen & neu posten ---
+        CHANNEL_BEWERBUNG = 1534579610497581180
+        chan_bew = bot.get_channel(CHANNEL_BEWERBUNG)
+        if chan_bew:
+            try:
+                await chan_bew.purge(limit=10)
+            except Exception:
+                pass
+            
+            embed_bew = discord.Embed(
+                title="📝 TEAM BEWERBUNG",
+                description="Möchtest du ein Teil unseres Teams werden? Klicke auf den Button unten, um dich zu bewerben!",
+                color=discord.Color.gold()
+            )
+            embed_bew.set_footer(text="🤖 Bewerbungs System")
+            await chan_bew.send(embed=embed_bew, view=BewerbungView())
 
     except Exception as e:
         print(f"Fehler beim Start: {e}")
