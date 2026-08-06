@@ -119,7 +119,6 @@ class RankSystem(commands.Cog):
         warns_data = load_warns()
         user_id_str = str(member.id)
 
-        # Warnung zählen
         if user_id_str not in warns_data:
             warns_data[user_id_str] = 0
         
@@ -140,18 +139,14 @@ class RankSystem(commands.Cog):
         )
         embed.set_footer(text="🤖 Moderation System")
 
-        team_removed_text = ""
-        # Prüfen ob 3 Warns erreicht wurden
+        # Prüfen ob 3 Warns erreicht wurden und Rolle entziehen
         if current_warns >= 3:
             team_role = interaction.guild.get_role(TEAM_ROLE_ID)
-            if team_role and team_role in member.roles:
+            if team_role:
                 try:
                     await member.remove_roles(team_role)
-                    team_removed_text = "\n\n🚨 **Da 3 Warnungen erreicht wurden, wurde dem Mitglied die Team-Rolle entzogen!**"
-                except:
-                    pass
-
-        embed.description += team_removed_text
+                except Exception as e:
+                    print(f"Konnte Team-Rolle nicht entfernen: {e}")
 
         await interaction.response.send_message(embed=embed)
 
