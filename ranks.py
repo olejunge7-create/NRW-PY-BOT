@@ -31,7 +31,7 @@ class RankSystem(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def create_rank_embed(self, member: discord.Member, typ: str, alter_rang: str, neue_rolle: discord.Role) -> discord.Embed:
+    def create_rank_embed(self, member: discord.Member, typ: str, alter_rang: str, neue_rolle: discord.Role, grund: str, ausfuehrer: discord.Member) -> discord.Embed:
         if typ == "promote":
             title_text = "📈 **Beförderung**"
             desc_text = "🎉 Herzlichen Glückwunsch! Aufgrund deiner Aktivität und deines Engagements wurdest du befördert.\nViel Erfolg in deiner neuen Position! 🚀"
@@ -47,15 +47,17 @@ class RankSystem(commands.Cog):
                 f"👤 **Mitglied:** {member.mention}\n"
                 f"{title_text}\n\n"
                 f"**Alter Rang:** {alter_rang}\n"
-                f"➡️ **Neuer Rang:** {neue_rolle.name}\n\n"
+                f"➡️ **Neuer Rang:** {neue_rolle.name}\n"
+                f"📝 **Grund:** {grund}\n"
+                f"🛡️ **Durchgeführt von:** {ausfuehrer.mention}\n\n"
                 f"{desc_text}"
             ),
             color=color
         )
-        embed.set_footer(text="🤖 System  ")
+        embed.set_footer(text="🤖 System")
         return embed
 
-    async def _change_rank(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, typ: str):
+    async def _change_rank(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str, typ: str):
         if neue_rolle.id not in RANK_ROLES:
             await interaction.response.send_message("⚠️ Die angegebene Rolle ist keine gültige Rang-Rolle!", ephemeral=True)
             return
@@ -72,7 +74,7 @@ class RankSystem(commands.Cog):
         await member.add_roles(neue_rolle)
 
         # Embed erstellen & im Kanal senden
-        embed = self.create_rank_embed(member, typ, alter_rang_name, neue_rolle)
+        embed = self.create_rank_embed(member, typ, alter_rang_name, neue_rolle, grund, interaction.user)
         await interaction.response.send_message(embed=embed)
 
         # Nachricht per Privatnachricht (DM) senden
@@ -81,23 +83,48 @@ class RankSystem(commands.Cog):
         except discord.Forbidden:
             pass
 
-    # /promote @member @neue_rolle
+    # /promote @member @neue_rolle grund
     @app_commands.command(name="promote", description="Befördere ein Mitglied auf eine gewählte Rang-Rolle")
     @app_commands.checks.has_permissions(manage_roles=True)
-    async def promote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role):
-        await self._change_rank(interaction, member, neue_rolle, "promote")
+    async def promote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
+        await self._change_rank(interaction, member, neue_rolle, grund, "promote")
 
-    # /demote @member @neue_rolle
+    # /demote @member @neue_rolle grund
     @app_commands.command(name="demote", description="Degradiere ein Mitglied auf eine gewählte Rang-Rolle")
     @app_commands.checks.has_permissions(manage_roles=True)
-    async def demote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role):
-        await self._change_rank(interaction, member, neue_rolle, "demote")
+    async def demote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
+        await self._change_rank(interaction, member, neue_rolle, grund, "demote")
 
-    # /drang @member @neue_rolle
+    # /drang @member @neue_rolle grund
     @app_commands.command(name="drang", description="Degradiere ein Mitglied (D-Rang) auf eine gewählte Rang-Rolle")
     @app_commands.checks.has_permissions(manage_roles=True)
-    async def drang(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role):
-        await self._change_rank(interaction, member, neue_rolle, "demote")
+    async def drang(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
+        await self._change_rank(interaction, member, neue_rolle, grund, "demote")
+
+    # NEU: /warn @member grund
+    @app_commands.command(name="warn", description="Verwarne ein Mitglied auf dem Server")
+    @app_commands.checks.has_permissions(manage_messages=True)
+    async def warn(self, interaction: discord.Interaction, member: discord.Member, grund: str):
+        embed = discord.Embed(
+            title="╭━━━━━━━━━━━━━━━━━━━━━━━╮\n⚠️ VERWARNUNG\n╰━━━━━━━━━━━━━━━━━━━━━━━╯",
+            description=(
+                f"👤 **Mitglied:** {member.mention}\n"
+                f"📝 **Grund:** {grund}\n"
+                f"🛡️ **Verwarnt von:** {interaction.user.mention}\n\n"
+                f"Bitte halte dich an die Serverregeln, um weitere Sanktionen zu vermeiden."
+            ),
+            color=discord.Color.orange()
+        )
+        embed.set_footer(text="🤖 Moderation System")
+
+        # Im Kanal antworten
+        await interaction.response.send_message(embed=embed)
+
+        # Dem User zusätzlich per DM schicken
+        try:
+            await member.send(embed=embed)
+        except discord.Forbidden:
+            pass
 
 async def setup(bot):
     await bot.add_cog(RankSystem(bot))
