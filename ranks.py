@@ -5,8 +5,8 @@ from discord import app_commands
 from discord.ext import commands
 
 WARNS_FILE = "warns.json"
-TEAM_ROLE_ID = 1534325338170065136
 
+# Alle 21 Rang-/Team-Rollen, die der Bot automatisch suchen und entfernen soll
 RANK_ROLES = [
     1534325338182520991,  # Rang 1
     1534325338182520992,  # Rang 2
@@ -28,7 +28,8 @@ RANK_ROLES = [
     1534325338212007983,  # Rang 18
     1534325338212007984,  # Rang 19
     1534325338212007985,  # Rang 20
-    1534325338212007986   # Rang 21
+    1534325338212007986,  # Rang 21
+    1534325338170065136   # Die zusätzliche Team-Rolle (falls gewünscht)
 ]
 
 def load_warns():
@@ -125,15 +126,22 @@ class RankSystem(commands.Cog):
 
         team_action_text = ""
 
-        # Wenn 3 Warns erreicht sind -> Rolle weg und Warns resetten
+        # Wenn 3 Warns erreicht sind -> ALLE Rollen aus der Liste beim User suchen und entfernen!
         if current_warns >= 3:
-            team_role = interaction.guild.get_role(TEAM_ROLE_ID)
-            if team_role:
-                try:
-                    await member.remove_roles(team_role)
-                    team_action_text = "\n\n🚨 **3 Warns erreicht: Team-Rolle wurde entzogen & Warns wurden zurückgesetzt!**"
-                except Exception as e:
-                    team_action_text = f"\n\n⚠️ *Konnte Team-Rolle nicht entfernen (Fehler: {e})*"
+            removed_roles_count = 0
+            for role_id in RANK_ROLES:
+                role = interaction.guild.get_role(role_id)
+                if role and role in member.roles:
+                    try:
+                        await member.remove_roles(role)
+                        removed_roles_count += 1
+                    except:
+                        pass
+            
+            if removed_roles_count > 0:
+                team_action_text = f"\n\n🚨 **3 Warns erreicht: {removed_roles_count} Team-/Rang-Rolle(n) wurden entzogen & Warns zurückgesetzt!**"
+            else:
+                team_action_text = "\n\n🚨 **3 Warns erreicht: Warns wurden zurückgesetzt!**"
             
             # Warns wieder auf 0 setzen
             warns_data[user_id_str] = 0
