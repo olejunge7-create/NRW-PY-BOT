@@ -6,7 +6,6 @@ from discord.ext import commands
 
 WARNS_FILE = "warns.json"
 
-# Alle 21 Rang-/Team-Rollen, die der Bot automatisch suchen und entfernen soll
 RANK_ROLES = [
     1534325338182520991,  # Rang 1
     1534325338182520992,  # Rang 2
@@ -29,7 +28,7 @@ RANK_ROLES = [
     1534325338212007984,  # Rang 19
     1534325338212007985,  # Rang 20
     1534325338212007986,  # Rang 21
-    1534325338182520990   # Die zusätzliche Team-Rolle (falls gewünscht)
+    1534325338170065136   # Zusätzliche Team-Rolle
 ]
 
 def load_warns():
@@ -97,19 +96,14 @@ class RankSystem(commands.Cog):
         except discord.Forbidden:
             pass
 
-    @app_commands.command(name="promote", description="Befördere ein Mitglied auf eine gewählte Rang-Rolle")
+    @app_commands.command(name="beförderung", description="Befördere ein Mitglied auf eine gewählte Rang-Rolle")
     @app_commands.checks.has_permissions(manage_roles=True)
-    async def promote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
+    async def beförderung(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
         await self._change_rank(interaction, member, neue_rolle, grund, "promote")
 
-    @app_commands.command(name="demote", description="Degradiere ein Mitglied auf eine gewählte Rang-Rolle")
+    @app_commands.command(name="degradierung", description="Degradiere ein Mitglied auf eine gewählte Rang-Rolle")
     @app_commands.checks.has_permissions(manage_roles=True)
-    async def demote(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
-        await self._change_rank(interaction, member, neue_rolle, grund, "demote")
-
-    @app_commands.command(name="drang", description="Degradiere ein Mitglied (D-Rang) auf eine gewählte Rang-Rolle")
-    @app_commands.checks.has_permissions(manage_roles=True)
-    async def drang(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
+    async def degradierung(self, interaction: discord.Interaction, member: discord.Member, neue_rolle: discord.Role, grund: str):
         await self._change_rank(interaction, member, neue_rolle, grund, "demote")
 
     @app_commands.command(name="warn", description="Verwarne ein Mitglied auf dem Server")
@@ -126,7 +120,6 @@ class RankSystem(commands.Cog):
 
         team_action_text = ""
 
-        # Wenn 3 Warns erreicht sind -> ALLE Rollen aus der Liste beim User suchen und entfernen!
         if current_warns >= 3:
             removed_roles_count = 0
             for role_id in RANK_ROLES:
@@ -143,7 +136,6 @@ class RankSystem(commands.Cog):
             else:
                 team_action_text = "\n\n🚨 **3 Warns erreicht: Warns wurden zurückgesetzt!**"
             
-            # Warns wieder auf 0 setzen
             warns_data[user_id_str] = 0
             current_warns = 0
 
