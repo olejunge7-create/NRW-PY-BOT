@@ -1,7 +1,21 @@
 import discord
 from discord.ext import commands
 import os
+from flask import Flask
+import threading
 
+# Flask-App für Render (damit der Port offen ist)
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run_flask():
+    port = int(os.getenv("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+# Discord Bot Setup
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -11,7 +25,6 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Alle Cogs (Tickets, Bewerbung, Warn-System und Ranks) automatisch laden
         extensions = ["tickets", "bewerbung", "warn", "ranks"]
         for ext in extensions:
             try:
@@ -20,7 +33,6 @@ class MyBot(commands.Bot):
             except Exception as e:
                 print(f"Fehler beim Laden von {ext}: {e}")
 
-        # Slash-Befehle global synchronisieren
         await self.tree.sync()
         print("Slash-Befehle erfolgreich synchronisiert!")
 
@@ -30,18 +42,21 @@ bot = MyBot()
 async def on_ready():
     print(f"Eingeloggt als {bot.user}!")
 
-# Slash-Befehl zum Erstellen der Panels im Kanal
 @bot.tree.command(name="setup_panels", description="Sendet die Ticket- und Bewerbungs-Panels in den aktuellen Kanal.")
 @discord.app_commands.checks.has_permissions(administrator=True)
 async def setup_panels(interaction: discord.Interaction):
     from tickets import TicketView
     from bewerbung import BewerbungView
 
-    # Antwort senden, damit die Interaktion nicht fehlschlägt
     await interaction.response.send_message("✅ Panels werden erstellt...", ephemeral=True)
-
-    # Panels in den Kanal schicken
     await interaction.channel.send("🎫 **Support-Ticket erstellen**\nKlicke auf den Button unten, um ein Ticket zu öffnen:", view=TicketView())
     await interaction.channel.send("📝 **Team-Bewerbung**\nKlicke auf den Button unten, um dich zu bewerben:", view=BewerbungView())
 
-bot.run(os.getenv("DISCORD_TOKEN"))
+if __name__ == "__main__":
+    # Flask in einem separaten Thread starten, damit der Bot und der Webserver gleichzeitig laufen
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+
+    # Bot starten
+    bot.run(os.getenv("DISCORD_TOKEN"))
