@@ -3,7 +3,8 @@ from discord.ext import commands
 import asyncio
 
 TEAMLEITUNG_ROLE_ID = 1534325338199556145
-BEWERBUNG_LOG_CHANNEL_ID = 1534552376911073451
+# Hier kommt die ID hin, wo das Team die fertigen Bewerbungen sehen soll:
+BEWERBUNG_LOG_CHANNEL_ID = 1534552376911073451  # Falls das ein anderer Log-Kanal ist, hier anpassen!
 
 class BewerbungsEntscheidView(discord.ui.View):
     def __init__(self):
@@ -12,7 +13,8 @@ class BewerbungsEntscheidView(discord.ui.View):
     def check_permissions(self, interaction: discord.Interaction) -> bool:
         teamleitung_role = interaction.guild.get_role(TEAMLEITUNG_ROLE_ID)
         is_admin = interaction.user.guild_permissions.administrator
-        if is_admin: return True
+        if is_admin: 
+            return True
         if teamleitung_role:
             return any(r.position >= teamleitung_role.position for r in interaction.user.roles)
         return False
@@ -44,18 +46,17 @@ class BewerbungButtonView(discord.ui.View):
         super().__init__(timeout=None)
         self.bot = bot
 
-    @discord.ui.button(label="Jetzt bewerben", style=discord.ButtonStyle.blurple, custom_id="open_bewerbung_dm", emoji="📝")
+    @discord.ui.button(label="Bewerben", style=discord.ButtonStyle.blurple, custom_id="open_bewerbung_dm", emoji="📝")
     async def open_dm_bewerbung(self, interaction: discord.Interaction, button: discord.ui.Button):
         user = interaction.user
-        await interaction.response.send_message("📬 Check deine DMs!", ephemeral=True)
+        await interaction.response.send_message("📬 Check deine DMs! Ich habe dir die Fragen geschickt.", ephemeral=True)
 
         try:
             dm = await user.create_dm()
             def check(m): return m.author == user and isinstance(m.channel, discord.DMChannel)
 
-            await dm.send("📝 **Team-Bewerbung (10 Fragen)**")
+            await dm.send("📝 **Team-Bewerbung (10 Fragen)**\nBeantworte bitte nacheinander die folgenden Fragen:")
             
-            # Fragen-Liste
             fragen = [
                 ("1/10: Wie ist dein Name?", "name"),
                 ("2/10: Wie alt bist du?", "alter"),
@@ -77,26 +78,33 @@ class BewerbungButtonView(discord.ui.View):
                 # Wort-Check für Frage 10
                 if key == "warum_du":
                     wörter = msg.content.split()
-                    if len(wörter) < 300:
-                        await dm.send(f"⚠️ Deine Antwort ist zu kurz ({len(wörter)} Wörter). Wir benötigen mindestens 300 Wörter. Bitte schreibe es nochmal neu:")
+                    while len(wörter) < 300:
+                        await dm.send(f"⚠️ Deine Antwort ist zu kurz ({len(wörter)} Wörter). Wir benötigen **mindestens 300 Wörter**. Bitte schreibe es ausführlicher neu:")
                         msg = await self.bot.wait_for('message', timeout=600.0, check=check)
+                        wörter = msg.content.split()
                 
                 antworten[key] = msg.content
 
-            # Log-Embed
+            # Log-Embed erstellen
             embed = discord.Embed(title=f"📝 Neue Bewerbung: {user.name}", color=discord.Color.gold())
             for frage_text, key in fragen:
                 embed.add_field(name=frage_text, value=antworten[key], inline=False)
             embed.add_field(name="Status", value="⏳ Ausstehend", inline=False)
 
             log_channel = interaction.guild.get_channel(BEWERBUNG_LOG_CHANNEL_ID)
-            await log_channel.send(embed=embed, view=BewerbungsEntscheidView())
-            await dm.send("✅ Bewerbung abgeschickt!")
+            if log_channel:
+                await log_channel.send(embed=embed, view=BewerbungsEntscheidView())
+            
+            await dm.send("✅ Deine Bewerbung wurde erfolgreich abgeschickt!")
 
         except asyncio.TimeoutError:
-            await user.send("⏰ Zeit abgelaufen.")
+            await user.send("⏰ Deine Zeit ist abgelaufen. Die Bewerbung wurde abgebrochen.")
         except discord.Forbidden:
-            await interaction.followup.send("❌ DMs sind geschlossen!", ephemeral=True)
+            await interaction.followup.send("❌ Ich konnte dir keine DM senden! Bitte aktiviere deine Direktnachrichten.", ephemeral=True)
+
+class BewerbungCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
 async def setup(bot):
-    await bot.add_cog(commands.Cog(None)) # Platzhalter für Struktur
+    await bot.add_cog(BewerbungCog(bot))
