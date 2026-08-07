@@ -53,19 +53,31 @@ bot = MyBot()
 async def on_ready():
     print(f"Eingeloggt als {bot.user}!")
 
-# Neuer Befehl nur für Tickets
-@bot.tree.command(name="setup_ticket", description="Sendet das Ticket-Panel.")
+# Ticket-Setup mit automatischem Kanal-Clear
+@bot.tree.command(name="setup_ticket", description="Leert den Kanal und sendet das Ticket-Panel.")
 @discord.app_commands.checks.has_permissions(administrator=True)
 async def setup_ticket(interaction: discord.Interaction):
-    await interaction.response.send_message("✅ Ticket-Panel wird erstellt...", ephemeral=True)
+    await interaction.response.defer(ephemeral=True)
+    
+    # Löscht alle Nachrichten im Kanal (bis zu 100 Stück)
+    deleted = await interaction.channel.purge(limit=100)
+    
+    # Sendet das neue Panel
     await interaction.channel.send("🎫 **Support-Ticket erstellen**\nKlicke auf den Button unten, um ein Ticket zu öffnen:", view=TicketView())
+    await interaction.followup.send(f"✅ Kanal erfolgreich geleert und Ticket-Panel gesendet! ({len(deleted)} alte Nachrichten gelöscht)", ephemeral=True)
 
-# Neuer Befehl nur für Bewerbungen
-@bot.tree.command(name="setup_bewerbung", description="Sendet das Bewerbungs-Panel.")
+# Bewerbungs-Setup mit automatischem Kanal-Clear
+@bot.tree.command(name="setup_bewerbung", description="Leert den Kanal und sendet das Bewerbungs-Panel.")
 @discord.app_commands.checks.has_permissions(administrator=True)
 async def setup_bewerbung(interaction: discord.Interaction):
-    await interaction.response.send_message("✅ Bewerbungs-Panel wird erstellt...", ephemeral=True)
+    await interaction.response.defer(ephemeral=True)
+    
+    # Löscht alle Nachrichten im Kanal (bis zu 100 Stück)
+    deleted = await interaction.channel.purge(limit=100)
+    
+    # Sendet das neue Panel
     await interaction.channel.send("📝 **Team-Bewerbung**\nKlicke auf den Button unten, um dich zu bewerben:", view=BewerbungView())
+    await interaction.followup.send(f"✅ Kanal erfolgreich geleert und Bewerbungs-Panel gesendet! ({len(deleted)} alte Nachrichten gelöscht)", ephemeral=True)
 
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask)
