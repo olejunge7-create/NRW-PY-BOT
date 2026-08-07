@@ -18,27 +18,59 @@ class BewerbungsEntscheidView(discord.ui.View):
             return any(r.position >= teamleitung_role.position for r in interaction.user.roles)
         return False
 
+    async def get_applicant_user(self, interaction: discord.Interaction):
+        # Versucht den Bewerber anhand des Embed-Titels herauszufinden
+        embed = interaction.message.embeds[0]
+        title = embed.title  # Beispiel: "📝 Neue Bewerbung: Username"
+        username = title.split("📝 Neue Bewerbung: ")[-1]
+        
+        # In der Guild nach dem Member suchen
+        for member in interaction.guild.members:
+            if member.name == username or member.display_name == username:
+                return member
+        return None
+
     @discord.ui.button(label="Annehmen", style=discord.ButtonStyle.green, custom_id="accept_bewerbung", emoji="✅")
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.check_permissions(interaction):
             await interaction.response.send_message("❌ Nur für Teamleitung!", ephemeral=True)
             return
+        
         embed = interaction.message.embeds[0]
         embed.color = discord.Color.green()
         embed.set_field_at(10, name="Status", value=f"✅ Angenommen von {interaction.user.mention}", inline=False)
         await interaction.response.edit_message(embed=embed, view=None)
-        await interaction.followup.send("Bewerbung angenommen.")
+        
+        # Dem Bewerber eine DM schicken
+        applicant = await self.get_applicant_user(interaction)
+        if applicant:
+            try:
+                await applicant.send("🎉 **Glückwunsch!** Deine Bewerbung wurde soeben **angenommen**. Das Team wird sich bald bei dir melden.")
+            except discord.Forbidden:
+                pass
+
+        await interaction.followup.send("Bewerbung angenommen und User benachrichtigt.")
 
     @discord.ui.button(label="Ablehnen", style=discord.ButtonStyle.red, custom_id="deny_bewerbung", emoji="❌")
     async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.check_permissions(interaction):
             await interaction.response.send_message("❌ Nur für Teamleitung!", ephemeral=True)
             return
+        
         embed = interaction.message.embeds[0]
         embed.color = discord.Color.red()
         embed.set_field_at(10, name="Status", value=f"❌ Abgelehnt von {interaction.user.mention}", inline=False)
         await interaction.response.edit_message(embed=embed, view=None)
-        await interaction.followup.send("Bewerbung abgelehnt.")
+        
+        # Dem Bewerber eine DM schicken
+        applicant = await self.get_applicant_user(interaction)
+        if applicant:
+            try:
+                await applicant.send("❌ Schade! Deine Bewerbung wurde leider **abgelehnt**. Wir wünschen dir dennoch viel Erfolg weiterhin.")
+            except discord.Forbidden:
+                pass
+
+        await interaction.followup.send("Bewerbung abgelehnt und User benachrichtigt.")
 
 class BewerbungView(discord.ui.View):
     def __init__(self, bot):
@@ -75,7 +107,6 @@ class BewerbungView(discord.ui.View):
                 msg = await self.bot.wait_for('message', timeout=600.0, check=check)
                 antworten[key] = msg.content
 
-            # Log-Embed erstellen und abschicken
             embed = discord.Embed(title=f"📝 Neue Bewerbung: {user.name}", color=discord.Color.gold())
             for frage_text, key in fragen:
                 embed.add_field(name=frage_text, value=antworten[key], inline=False)
