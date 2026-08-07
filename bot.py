@@ -4,7 +4,6 @@ import os
 from flask import Flask
 import threading
 
-# Importiere die Views
 from tickets import TicketView, CloseTicketView
 from bewerbung import BewerbungView
 
@@ -28,7 +27,6 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Cogs laden
         extensions = ["tickets", "bewerbung", "warn", "ranks"]
         for ext in extensions:
             try:
@@ -43,7 +41,6 @@ class MyBot(commands.Bot):
         self.add_view(BewerbungView())
         print("Persistente Views registriert!")
 
-        # Slash-Befehle synchronisieren
         await self.tree.sync()
         print("Slash-Befehle synchronisiert!")
 
@@ -52,32 +49,34 @@ bot = MyBot()
 @bot.event
 async def on_ready():
     print(f"Eingeloggt als {bot.user}!")
+    
+    # Deine IDs
+    TICKET_CHANNEL_ID = 1534325339369635991
+    BEWERBUNG_CHANNEL_ID = 1534579610497581180
+    
+    # 1. Automatisches Ticket-Panel
+    ticket_channel = bot.get_channel(TICKET_CHANNEL_ID)
+    if ticket_channel:
+        exists = False
+        async for message in ticket_channel.history(limit=10):
+            if message.author == bot.user and "Support-Ticket" in message.content:
+                exists = True
+                break
+        if not exists:
+            await ticket_channel.send("🎫 **Support-Ticket erstellen**\nKlicke auf den Button unten, um ein Ticket zu öffnen:", view=TicketView())
+            print("Ticket-Panel automatisch gesendet!")
 
-# Ticket-Setup mit automatischem Kanal-Clear
-@bot.tree.command(name="setup_ticket", description="Leert den Kanal und sendet das Ticket-Panel.")
-@discord.app_commands.checks.has_permissions(administrator=True)
-async def setup_ticket(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-    
-    # Löscht alle Nachrichten im Kanal (bis zu 100 Stück)
-    deleted = await interaction.channel.purge(limit=100)
-    
-    # Sendet das neue Panel
-    await interaction.channel.send("🎫 **Support-Ticket erstellen**\nKlicke auf den Button unten, um ein Ticket zu öffnen:", view=TicketView())
-    await interaction.followup.send(f"✅ Kanal erfolgreich geleert und Ticket-Panel gesendet! ({len(deleted)} alte Nachrichten gelöscht)", ephemeral=True)
-
-# Bewerbungs-Setup mit automatischem Kanal-Clear
-@bot.tree.command(name="setup_bewerbung", description="Leert den Kanal und sendet das Bewerbungs-Panel.")
-@discord.app_commands.checks.has_permissions(administrator=True)
-async def setup_bewerbung(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-    
-    # Löscht alle Nachrichten im Kanal (bis zu 100 Stück)
-    deleted = await interaction.channel.purge(limit=100)
-    
-    # Sendet das neue Panel
-    await interaction.channel.send("📝 **Team-Bewerbung**\nKlicke auf den Button unten, um dich zu bewerben:", view=BewerbungView())
-    await interaction.followup.send(f"✅ Kanal erfolgreich geleert und Bewerbungs-Panel gesendet! ({len(deleted)} alte Nachrichten gelöscht)", ephemeral=True)
+    # 2. Automatisches Bewerbungs-Panel
+    bewerbung_channel = bot.get_channel(BEWERBUNG_CHANNEL_ID)
+    if bewerbung_channel:
+        exists = False
+        async for message in bewerbung_channel.history(limit=10):
+            if message.author == bot.user and "Team-Bewerbung" in message.content:
+                exists = True
+                break
+        if not exists:
+            await bewerbung_channel.send("📝 **Team-Bewerbung**\nKlicke auf den Button unten, um dich zu bewerben:", view=BewerbungView())
+            print("Bewerbungs-Panel automatisch gesendet!")
 
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask)
