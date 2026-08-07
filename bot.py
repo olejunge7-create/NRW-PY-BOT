@@ -28,7 +28,6 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # "regeln" wurde hier hinzugefügt
         extensions = ["tickets", "bewerbung", "warn", "ranks", "regeln"]
         for ext in extensions:
             try:
@@ -37,7 +36,7 @@ class MyBot(commands.Bot):
             except Exception as e:
                 print(f"Fehler beim Laden von {ext}: {e}")
 
-        # Views registrieren (BewerbungView benötigt den bot als Argument 'self')
+        # Views registrieren
         self.add_view(TicketView())
         self.add_view(CloseTicketView())
         self.add_view(BewerbungView(self))
@@ -55,7 +54,7 @@ async def on_ready():
     TICKET_CHANNEL_ID = 1534325339369635991
     BEWERBUNG_CHANNEL_ID = 1534579610497581180
     
-    # 1. Automatisches Ticket-Panel mit Dropdown
+    # 1. Automatisches Ticket-Panel
     ticket_channel = bot.get_channel(TICKET_CHANNEL_ID)
     if ticket_channel:
         exists = False
@@ -66,11 +65,11 @@ async def on_ready():
         if not exists:
             embed = discord.Embed(
                 title="🎟️ NRW RP Tickets",
-                description="Wähle eine Kategorie aus, um ein Ticket zu erstellen.\n\n• Support & Fragen\n• Team-Bewerbungen\n• Partner-Anfragen\n• Sonstiges\n\n• Wähle eine Kategorie aus dem Menü\n• Du erhältst einen privaten Ticket-Channel\n• Respektvoller Umgang = schnellere Hilfe",
+                description="Wähle eine Kategorie aus, um ein Ticket zu erstellen.\n\n• Support & Fragen\n• Team-Bewerbungen\n• Partner-Anfragen\n• Sonstiges",
                 color=discord.Color.purple()
             )
             await ticket_channel.send(embed=embed, view=TicketView())
-            print("Ticket-Dropdown-Panel automatisch gesendet!")
+            print("Ticket-Panel automatisch gesendet!")
 
     # 2. Automatisches Bewerbungs-Panel
     bewerbung_channel = bot.get_channel(BEWERBUNG_CHANNEL_ID)
@@ -83,7 +82,7 @@ async def on_ready():
         if not exists:
             embed = discord.Embed(
                 title="📝 Team-Bewerbungen",
-                description="Möchtest du Teil unseres Teams werden?\n\n• Klicke auf den Button unten\n• Beantworte die Fragen direkt im privaten Chat (DM) mit dem Bot\n• Zeige Ehrlichkeit und Ausführlichkeit",
+                description="Möchtest du Teil unseres Teams werden?\n\n• Klicke auf den Button unten\n• Beantworte die Fragen direkt im privaten Chat (DM)",
                 color=discord.Color.blue()
             )
             await bewerbung_channel.send(embed=embed, view=BewerbungView(bot))
