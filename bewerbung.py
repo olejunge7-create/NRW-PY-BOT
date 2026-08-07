@@ -11,7 +11,11 @@ QUESTIONS = [
 
 class BewerbungModal(discord.ui.Modal, title="Team-Bewerbung"):
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Check deine Privatnachrichten (DMs), um die Bewerbungsfragen zu beantworten!", ephemeral=True)
+        # Hier nutzen wir try/except, falls das Senden in die DMs fehlschlägt
+        try:
+            await interaction.response.send_message("Check deine Privatnachrichten (DMs), um die Bewerbungsfragen zu beantworten!", ephemeral=True)
+        except discord.HTTPException:
+            return
         
         user = interaction.user
         try:
@@ -36,7 +40,7 @@ class BewerbungModal(discord.ui.Modal, title="Team-Bewerbung"):
 
         await dm_channel.send("✅ **Vielen Dank!** Deine Bewerbung wurde komplett ausgefüllt und an das Team weitergeleitet.")
 
-        # Admin/Team Kanal Benachrichtigung (ID anpassen falls nötig)
+        # Admin/Team Kanal Benachrichtigung
         admin_channel = interaction.client.get_channel(1534552376911073451)
         if admin_channel:
             embed = discord.Embed(
@@ -52,16 +56,14 @@ class BewerbungView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="📝 Bewerben", style=discord.ButtonStyle.blurple, custom_id="apply_button_persistent")
+    @discord.ui.button(label="Bewerben", style=discord.ButtonStyle.blurple, custom_id="apply_button_persistent", emoji="📝")
     async def apply_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Öffnet das Modal direkt und fehlerfrei
         await interaction.response.send_modal(BewerbungModal())
 
 class BewerbungCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-
-    async def cog_load(self):
-        self.bot.add_view(BewerbungView())
 
 async def setup(bot):
     await bot.add_cog(BewerbungCog(bot))
