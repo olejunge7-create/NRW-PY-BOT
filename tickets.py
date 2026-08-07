@@ -2,20 +2,55 @@ import discord
 from discord.ext import commands
 import asyncio
 
-def get_allowed_roles(guild, min_role_id):
-    min_role = guild.get_role(min_role_id)
-    if not min_role:
+# Deine komplette Rang-Liste von unten nach oben
+ROLE_HIERARCHY = [
+    1534325338182520991,  # Rang 1
+    1534325338182520992,  # Rang 2
+    1534325338182520993,  # Rang 3
+    1534325338182520994,  # Rang 4
+    1534325338199556137,  # Rang 5
+    1534325338199556138,  # Rang 6
+    1534325338199556139,  # Rang 7
+    1534325338199556140,  # Rang 8
+    1534325338199556142,  # Rang 9
+    1534325338199556143,  # Rang 10
+    1534325338199556145,  # Rang 11 (Teamleitung / Bewerbungen ab hier)
+    1534325338199556146,  # Rang 12
+    1534325338212007978,  # Rang 13
+    1534325338212007979,  # Rang 14 (Partner-Anfragen ab hier)
+    1534325338212007980,  # Rang 15
+    1534325338212007981,  # Rang 16
+    1534325338212007982,  # Rang 17
+    1534325338212007983,  # Rang 18
+    1534325338212007984,  # Rang 19
+    1534325338212007985,  # Rang 20
+    1534325338212007986,  # Rang 21
+]
+
+def get_roles_from_threshold(guild, threshold_role_id):
+    """Gibt die Schwellenrolle und alle Rollen darüber aus der Hierarchie zurück"""
+    try:
+        threshold_index = ROLE_HIERARCHY.index(threshold_role_id)
+    except ValueError:
         return []
-    # Gibt die angegebene Rolle und alle Rollen, die darüber stehen, zurück
-    return [role for role in guild.roles if role.position >= min_role.position]
+    
+    # Nimm alle Rollen ab dem Index bis zum Ende der Liste
+    valid_ids = ROLE_HIERARCHY[threshold_index:]
+    
+    allowed_roles = []
+    for r_id in valid_ids:
+        role = guild.get_role(r_id)
+        if role:
+            allowed_roles.append(role)
+    return allowed_roles
 
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label="Support & Fragen", description="Allgemeine Anfragen", emoji="🎫"),
-            discord.SelectOption(label="Team-Bewerbungen", description="Bewirb dich für unser Team", emoji="🧑‍💻"),
-            discord.SelectOption(label="Partner-Anfragen", description="Frage eine Partnerschaft an", emoji="🤝"),
-            discord.SelectOption(label="Sonstiges", description="Für alle anderen Anliegen", emoji="📂")
+            discord.SelectOption(label="Support & Fragen", description="Ab Rang 2 und höher", emoji="🎫"),
+            discord.SelectOption(label="Team-Bewerbungen", description="Ab Teamleitung (Rang 11) und höher", emoji="🧑‍💻"),
+            discord.SelectOption(label="Partner-Anfragen", description="Ab Rang 14 und höher", emoji="🤝"),
+            discord.SelectOption(label="Sonstiges", description="Ab Rang 1 und höher", emoji="📂")
         ]
         super().__init__(placeholder="Ticket-Kategorie auswählen...", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
 
@@ -23,17 +58,17 @@ class TicketSelect(discord.ui.Select):
         guild = interaction.guild
         selected_label = self.values[0]
         
-        # Hier weisen wir jeder Kategorie exakt deine gewünschte minimale Rollen-ID zu:
+        # Weist jeder Kategorie die exakte Start-Rollen-ID aus deiner Liste zu:
         if selected_label == "Support & Fragen":
-            min_role_id = 1534325338182520992
+            min_role_id = 1534325338182520992  # Rang 2
         elif selected_label == "Sonstiges":
-            min_role_id = 1534325338182520991
+            min_role_id = 1534325338182520991  # Rang 1
         elif selected_label == "Partner-Anfragen":
-            min_role_id = 1534325338212007979
+            min_role_id = 1534325338212007979  # Rang 14
         elif selected_label == "Team-Bewerbungen":
-            min_role_id = 1534325338199556145
+            min_role_id = 1534325338199556145  # Rang 11
         else:
-            min_role_id = 0
+            min_role_id = ROLE_HIERARCHY[0]
 
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -41,8 +76,8 @@ class TicketSelect(discord.ui.Select):
             guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
         }
 
-        # Alle berechtigten Rollen (ab der ID und höher) hinzufügen
-        allowed_roles = get_allowed_roles(guild, min_role_id)
+        # Füge alle berechtigten Rollen hinzu
+        allowed_roles = get_roles_from_threshold(guild, min_role_id)
         for role in allowed_roles:
             overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
 
@@ -67,7 +102,7 @@ class TicketControlView(discord.ui.View):
 
     @discord.ui.button(label="Ticket beanspruchen", style=discord.ButtonStyle.green, custom_id="claim_ticket_btn", emoji="🙋‍♂️")
     async def claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        allowed_roles = get_allowed_roles(interaction.guild, self.min_role_id)
+        allowed_roles = get_roles_from_threshold(interaction.guild, self.min_role_id)
         is_admin = interaction.user.guild_permissions.administrator
         has_permission = is_admin or any(role in interaction.user.roles for role in allowed_roles)
 
