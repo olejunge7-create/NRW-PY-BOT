@@ -40,7 +40,6 @@ class BewerbungsEntscheidView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=None)
         await interaction.followup.send("Bewerbung abgelehnt.")
 
-# Hier heißt die Klasse jetzt exakt BewerbungView, damit bot.py sie fehlerfrei findet
 class BewerbungView(discord.ui.View):
     def __init__(self, bot):
         super().__init__(timeout=None)

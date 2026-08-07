@@ -76,11 +76,16 @@ async def on_ready():
     if bewerbung_channel:
         exists = False
         async for message in bewerbung_channel.history(limit=10):
-            if message.author == bot.user and "Team-Bewerbung" in message.content:
+            if message.embeds and message.embeds[0].title == "📝 Team-Bewerbungen":
                 exists = True
                 break
         if not exists:
-            await bewerbung_channel.send("📝 **Team-Bewerbung**\nKlicke auf den Button unten, um dich zu bewerben:", view=BewerbungView(bot))
+            embed = discord.Embed(
+                title="📝 Team-Bewerbungen",
+                description="Möchtest du Teil unseres Teams werden?\n\n• Klicke auf den Button unten\n• Beantworte die Fragen direkt im privaten Chat (DM) mit dem Bot\n• Zeige Ehrlichkeit und Ausführlichkeit",
+                color=discord.Color.blue()
+            )
+            await bewerbung_channel.send(embed=embed, view=BewerbungView(bot))
             print("Bewerbungs-Panel automatisch gesendet!")
 
 if __name__ == "__main__":
