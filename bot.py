@@ -35,7 +35,7 @@ class MyBot(commands.Bot):
             except Exception as e:
                 print(f"Fehler beim Laden von {ext}: {e}")
 
-        # Views für Persistenz registrieren
+        # Views registrieren
         self.add_view(TicketView())
         self.add_view(CloseTicketView())
         self.add_view(BewerbungView())
@@ -50,21 +50,26 @@ bot = MyBot()
 async def on_ready():
     print(f"Eingeloggt als {bot.user}!")
     
-    # Deine IDs
     TICKET_CHANNEL_ID = 1534325339369635991
     BEWERBUNG_CHANNEL_ID = 1534579610497581180
     
-    # 1. Automatisches Ticket-Panel
+    # 1. Automatisches Ticket-Panel mit Dropdown
     ticket_channel = bot.get_channel(TICKET_CHANNEL_ID)
     if ticket_channel:
         exists = False
         async for message in ticket_channel.history(limit=10):
-            if message.author == bot.user and "Support-Ticket" in message.content:
+            # Prüft den Embed-Titel statt des Contents
+            if message.embeds and message.embeds[0].title == "🎟️ NRW RP Tickets":
                 exists = True
                 break
         if not exists:
-            await ticket_channel.send("🎫 **Support-Ticket erstellen**\nKlicke auf den Button unten, um ein Ticket zu öffnen:", view=TicketView())
-            print("Ticket-Panel automatisch gesendet!")
+            embed = discord.Embed(
+                title="🎟️ NRW RP Tickets",
+                description="Wähle eine Kategorie aus, um ein Ticket zu erstellen.\n\n• Support & Fragen\n• Team-Bewerbungen\n• Partner-Anfragen\n• Sonstiges\n\n• Wähle eine Kategorie aus dem Menü\n• Du erhältst einen privaten Ticket-Channel\n• Respektvoller Umgang = schnellere Hilfe",
+                color=discord.Color.purple()
+            )
+            await ticket_channel.send(embed=embed, view=TicketView())
+            print("Ticket-Dropdown-Panel automatisch gesendet!")
 
     # 2. Automatisches Bewerbungs-Panel
     bewerbung_channel = bot.get_channel(BEWERBUNG_CHANNEL_ID)
