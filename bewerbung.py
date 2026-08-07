@@ -10,12 +10,19 @@ QUESTIONS = [
 ]
 
 class BewerbungModal(discord.ui.Modal, title="Team-Bewerbung"):
+    def __init__(self):
+        super().__init__()
+        self.reason = discord.ui.TextInput(
+            label="Deine Motivation / Kurze Info",
+            style=discord.TextStyle.long,
+            placeholder="Schreibe hier kurz etwas...",
+            required=True,
+            max_length=300
+        )
+        self.add_item(self.reason)
+
     async def on_submit(self, interaction: discord.Interaction):
-        # Hier nutzen wir try/except, falls das Senden in die DMs fehlschlägt
-        try:
-            await interaction.response.send_message("Check deine Privatnachrichten (DMs), um die Bewerbungsfragen zu beantworten!", ephemeral=True)
-        except discord.HTTPException:
-            return
+        await interaction.response.send_message("Check deine Privatnachrichten (DMs), um die Fragen zu beantworten!", ephemeral=True)
         
         user = interaction.user
         try:
@@ -40,7 +47,6 @@ class BewerbungModal(discord.ui.Modal, title="Team-Bewerbung"):
 
         await dm_channel.send("✅ **Vielen Dank!** Deine Bewerbung wurde komplett ausgefüllt und an das Team weitergeleitet.")
 
-        # Admin/Team Kanal Benachrichtigung
         admin_channel = interaction.client.get_channel(1534552376911073451)
         if admin_channel:
             embed = discord.Embed(
@@ -48,6 +54,7 @@ class BewerbungModal(discord.ui.Modal, title="Team-Bewerbung"):
                 color=discord.Color.gold()
             )
             embed.set_thumbnail(url=user.display_avatar.url)
+            embed.add_field(name="Eingabe aus Modal", value=self.reason.value, inline=False)
             for i in range(len(QUESTIONS)):
                 embed.add_field(name=QUESTIONS[i], value=answers[i], inline=False)
             await admin_channel.send(embed=embed)
@@ -58,7 +65,6 @@ class BewerbungView(discord.ui.View):
 
     @discord.ui.button(label="Bewerben", style=discord.ButtonStyle.blurple, custom_id="apply_button_persistent", emoji="📝")
     async def apply_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Öffnet das Modal direkt und fehlerfrei
         await interaction.response.send_modal(BewerbungModal())
 
 class BewerbungCog(commands.Cog):
