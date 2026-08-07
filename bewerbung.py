@@ -72,17 +72,22 @@ class BewerbungView(discord.ui.View):
             antworten = {}
             for frage_text, key in fragen:
                 await dm.send(f"**{frage_text}**")
-                msg = await self.bot.wait_for('message', timeout=600.0, check=check)
                 
-                if key == "warum_du":
-                    wörter = msg.content.split()
-                    while len(wörter) < 300:
-                        await dm.send(f"⚠️ Deine Antwort ist zu kurz ({len(wörter)} Wörter). Wir benötigen **mindestens 300 Wörter**. Bitte schreibe es ausführlicher neu:")
-                        msg = await self.bot.wait_for('message', timeout=600.0, check=check)
+                while True:
+                    msg = await self.bot.wait_for('message', timeout=600.0, check=check)
+                    
+                    # Spezieller Check für die 300 Wörter bei Frage 10
+                    if key == "warum_du":
                         wörter = msg.content.split()
-                
-                antworten[key] = msg.content
+                        if len(wörter) < 300:
+                            await dm.send(f"⚠️ Deine Antwort ist zu kurz ({len(wörter)} Wörter). Wir benötigen **mindestens 300 Wörter**. Bitte schreibe es ausführlicher neu:")
+                            continue  # Fragt erneut nach einer gültigen Nachricht
+                    
+                    # Wenn alles passt, speichern und raus aus der Schleife zur nächsten Frage
+                    antworten[key] = msg.content
+                    break
 
+            # Log-Embed erstellen und abschicken
             embed = discord.Embed(title=f"📝 Neue Bewerbung: {user.name}", color=discord.Color.gold())
             for frage_text, key in fragen:
                 embed.add_field(name=frage_text, value=antworten[key], inline=False)
