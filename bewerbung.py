@@ -3,8 +3,7 @@ from discord.ext import commands
 import asyncio
 
 TEAMLEITUNG_ROLE_ID = 1534325338199556145
-# Hier kommt die ID hin, wo das Team die fertigen Bewerbungen sehen soll:
-BEWERBUNG_LOG_CHANNEL_ID = 1534552376911073451  # Falls das ein anderer Log-Kanal ist, hier anpassen!
+BEWERBUNG_LOG_CHANNEL_ID = 1534552376911073451
 
 class BewerbungsEntscheidView(discord.ui.View):
     def __init__(self):
@@ -41,7 +40,8 @@ class BewerbungsEntscheidView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=None)
         await interaction.followup.send("Bewerbung abgelehnt.")
 
-class BewerbungButtonView(discord.ui.View):
+# Hier heißt die Klasse jetzt exakt BewerbungView, damit bot.py sie fehlerfrei findet
+class BewerbungView(discord.ui.View):
     def __init__(self, bot):
         super().__init__(timeout=None)
         self.bot = bot
@@ -75,7 +75,6 @@ class BewerbungButtonView(discord.ui.View):
                 await dm.send(f"**{frage_text}**")
                 msg = await self.bot.wait_for('message', timeout=600.0, check=check)
                 
-                # Wort-Check für Frage 10
                 if key == "warum_du":
                     wörter = msg.content.split()
                     while len(wörter) < 300:
@@ -85,7 +84,6 @@ class BewerbungButtonView(discord.ui.View):
                 
                 antworten[key] = msg.content
 
-            # Log-Embed erstellen
             embed = discord.Embed(title=f"📝 Neue Bewerbung: {user.name}", color=discord.Color.gold())
             for frage_text, key in fragen:
                 embed.add_field(name=frage_text, value=antworten[key], inline=False)
