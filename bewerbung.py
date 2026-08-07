@@ -1,87 +1,75 @@
 import discord
 from discord.ext import commands
-import os
-from flask import Flask
-import threading
+import asyncio
 
-# Importiere die Views
-from tickets import TicketView, CloseTicketView
-from bewerbung import BewerbungView
+QUESTIONS = [
+    "Wie alt bist du?",
+    "Welche Erfahrungen hast du bereits gesammelt?",
+    "Warum möchtest du in unser Team?",
+    "Wie viel Zeit kannst du pro Woche investieren?"
+]
 
-# Flask-Server für Render
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot is online!"
-
-def run_flask():
-    port = int(os.getenv("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-
-class MyBot(commands.Bot):
+class BewerbungModal(discord.ui.Modal, title="Team-Bewerbung"):
     def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
+        super().__init__()
+        self.reason = discord.ui.TextInput(
+            label="Deine Motivation / Kurze Info",
+            style=discord.TextStyle.long,
+            placeholder="Schreibe hier kurz etwas...",
+            required=True,
+            max_length=300
+        )
+        self.add_item(self.reason)
 
-    async def setup_hook(self):
-        # Cogs laden
-        extensions = ["tickets", "bewerbung", "warn", "ranks"]
-        for ext in extensions:
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.send_message("Check deine Privatnachrichten (DMs), um die Fragen zu beantworten!", ephemeral=True)
+        
+        user = interaction.user
+        try:
+            dm_channel = await user.create_dm()
+            await dm_channel.send("👋 Hallo! Schön, dass du dich bewirbst. Ich stelle dir jetzt ein paar Fragen nacheinander. Antworte einfach hier im Chat darauf.")
+        except discord.Forbidden:
+            return
+
+        answers = []
+        for i, q in enumerate(QUESTIONS):
+            await dm_channel.send(f"**Frage {i+1} von {len(QUESTIONS)}:**\n{q}")
+            
+            def check(m):
+                return m.author == user and isinstance(m.channel, discord.DMChannel)
+
             try:
-                await self.load_extension(ext)
-                print(f"{ext}-System erfolgreich geladen!")
-            except Exception as e:
-                print(f"Fehler beim Laden von {ext}: {e}")
+                msg = await interaction.client.wait_for('message', check=check, timeout=300.0)
+                answers.append(msg.content)
+            except asyncio.TimeoutError:
+                await dm_channel.send("❌ Die Bewerbung wurde abgebrochen, da du zu lange (über 5 Minuten) nicht geantwortet hast.")
+                return
 
-        # Views für Persistenz registrieren
-        self.add_view(TicketView())
-        self.add_view(CloseTicketView())
-        self.add_view(BewerbungView())
-        print("Persistente Views registriert!")
+        await dm_channel.send("✅ **Vielen Dank!** Deine Bewerbung wurde komplett ausgefüllt und an das Team weitergeleitet.")
 
-        # Slash-Befehle synchronisieren
-        await self.tree.sync()
-        print("Slash-Befehle synchronisiert!")
+        admin_channel = interaction.client.get_channel(1534552376911073451)
+        if admin_channel:
+            embed = discord.Embed(
+                title=f"📝 Neue Bewerbung: {user.display_name}",
+                color=discord.Color.gold()
+            )
+            embed.set_thumbnail(url=user.display_avatar.url)
+            embed.add_field(name="Eingabe aus Modal", value=self.reason.value, inline=False)
+            for i in range(len(QUESTIONS)):
+                embed.add_field(name=QUESTIONS[i], value=answers[i], inline=False)
+            await admin_channel.send(embed=embed)
 
-bot = MyBot()
+class BewerbungView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
 
-@bot.event
-async def on_ready():
-    print(f"Eingeloggt als {bot.user}!")
+    @discord.ui.button(label="Bewerben", style=discord.ButtonStyle.blurple, custom_id="apply_button_persistent", emoji="📝")
+    async def apply_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(BewerbungModal())
 
-# Ticket-Setup mit automatischem Kanal-Clear
-@bot.tree.command(name="setup_ticket", description="Leert den Kanal und sendet das Ticket-Panel.")
-@discord.app_commands.checks.has_permissions(administrator=True)
-async def setup_ticket(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-    
-    # Löscht alle Nachrichten im Kanal (bis zu 100 Stück)
-    deleted = await interaction.channel.purge(limit=100)
-    
-    # Sendet das neue Panel
-    await interaction.channel.send("🎫 **Support-Ticket erstellen**\nKlicke auf den Button unten, um ein Ticket zu öffnen:", view=TicketView())
-    await interaction.followup.send(f"✅ Kanal erfolgreich geleert und Ticket-Panel gesendet! ({len(deleted)} alte Nachrichten gelöscht)", ephemeral=True)
+class BewerbungCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
-# Bewerbungs-Setup mit automatischem Kanal-Clear
-@bot.tree.command(name="setup_bewerbung", description="Leert den Kanal und sendet das Bewerbungs-Panel.")
-@discord.app_commands.checks.has_permissions(administrator=True)
-async def setup_bewerbung(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-    
-    # Löscht alle Nachrichten im Kanal (bis zu 100 Stück)
-    deleted = await interaction.channel.purge(limit=100)
-    
-    # Sendet das neue Panel
-    await interaction.channel.send("📝 **Team-Bewerbung**\nKlicke auf den Button unten, um dich zu bewerben:", view=BewerbungView())
-    await interaction.followup.send(f"✅ Kanal erfolgreich geleert und Bewerbungs-Panel gesendet! ({len(deleted)} alte Nachrichten gelöscht)", ephemeral=True)
-
-if __name__ == "__main__":
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
-
-    bot.run(os.getenv("DISCORD_TOKEN"))
+async def setup(bot):
+    await bot.add_cog(BewerbungCog(bot))
