@@ -59,6 +59,26 @@ class WarnCog(commands.Cog):
 
         await interaction.response.send_message(f"✅ {member.mention} wurde erfolgreich verwarnt! (Gesamt: {total_warns})", ephemeral=True)
 
+    @discord.app_commands.command(name="unwarn", description="Entfernt eine bestimmte Verwarnung von einem Benutzer.")
+    @discord.app_commands.describe(member="Der Benutzer", warn_index="Die Nummer der Warnung (siehe /warnings)")
+    @discord.app_commands.checks.has_permissions(moderate_members=True)
+    async def unwarn(self, interaction: discord.Interaction, member: discord.Member, warn_index: int):
+        warnings = load_warnings()
+        guild_id = str(interaction.guild.id)
+        user_id = str(member.id)
+
+        user_warns = warnings.get(guild_id, {}).get(user_id, [])
+
+        if not user_warns or warn_index < 1 or warn_index > len(user_warns):
+            await interaction.response.send_message(f"❌ Ungültige Warn-Nummer! {member.mention} hat keine Warnung mit der Nummer #{warn_index}.", ephemeral=True)
+            return
+
+        # Da Listen bei 0 anfangen, ziehen wir 1 ab
+        removed = user_warns.pop(warn_index - 1)
+        save_warnings(warnings)
+
+        await interaction.response.send_message(f"✅ Warnung #{warn_index} von {member.mention} wurde erfolgreich entfernt!\n**Entfernter Grund:** {removed['reason']}", ephemeral=True)
+
     @discord.app_commands.command(name="warnings", description="Zeigt die Verwarnungen eines Benutzers an.")
     @discord.app_commands.describe(member="Der Benutzer, dessen Verwarnungen du sehen möchtest")
     async def warnings(self, interaction: discord.Interaction, member: discord.Member):
