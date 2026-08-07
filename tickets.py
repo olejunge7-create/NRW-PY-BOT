@@ -2,38 +2,46 @@ import discord
 from discord.ext import commands
 import asyncio
 
-# Hier definieren wir die Rollen-IDs für die jeweiligen Kategorien
-# Wir nutzen eine Liste der Rollen, die Zugriff haben sollen (die angegebene ID und alle mit höherer Priorität)
 def get_allowed_roles(guild, min_role_id):
     min_role = guild.get_role(min_role_id)
     if not min_role:
         return []
-    # Alle Rollen, deren Position >= der minimalen Rolle ist
+    # Gibt die angegebene Rolle und alle Rollen, die darüber stehen, zurück
     return [role for role in guild.roles if role.position >= min_role.position]
 
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label="Support & Fragen", value="1534325338182520992", description="Allgemeine Anfragen", emoji="🎫"),
-            discord.SelectOption(label="Team-Bewerbungen", value="1534325338199556145", description="Bewirb dich für unser Team", emoji="🧑‍💻"),
-            discord.SelectOption(label="Partner-Anfragen", value="1534325338212007979", description="Frage eine Partnerschaft an", emoji="🤝"),
-            discord.SelectOption(label="Sonstiges", value="1534325338182520991", description="Für alle anderen Anliegen", emoji="📂")
+            discord.SelectOption(label="Support & Fragen", description="Allgemeine Anfragen", emoji="🎫"),
+            discord.SelectOption(label="Team-Bewerbungen", description="Bewirb dich für unser Team", emoji="🧑‍💻"),
+            discord.SelectOption(label="Partner-Anfragen", description="Frage eine Partnerschaft an", emoji="🤝"),
+            discord.SelectOption(label="Sonstiges", description="Für alle anderen Anliegen", emoji="📂")
         ]
         super().__init__(placeholder="Ticket-Kategorie auswählen...", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
 
     async def callback(self, interaction: discord.Interaction):
         guild = interaction.guild
-        category_name = [opt.label for opt in self.options if opt.value == self.values[0]][0]
-        min_role_id = int(self.values[0])
+        selected_label = self.values[0]
         
-        # Erstelle Berechtigungen
+        # Hier weisen wir jeder Kategorie exakt deine gewünschte minimale Rollen-ID zu:
+        if selected_label == "Support & Fragen":
+            min_role_id = 1534325338182520992
+        elif selected_label == "Sonstiges":
+            min_role_id = 1534325338182520991
+        elif selected_label == "Partner-Anfragen":
+            min_role_id = 1534325338212007979
+        elif selected_label == "Team-Bewerbungen":
+            min_role_id = 1534325338199556145
+        else:
+            min_role_id = 0
+
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
             guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
         }
 
-        # Rollen mit Zugriff hinzufügen
+        # Alle berechtigten Rollen (ab der ID und höher) hinzufügen
         allowed_roles = get_allowed_roles(guild, min_role_id)
         for role in allowed_roles:
             overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
@@ -41,16 +49,15 @@ class TicketSelect(discord.ui.Select):
         channel_name = f"ticket-{interaction.user.name}".lower().replace(" ", "-")
         ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
 
-        await interaction.response.send_message(f"✅ Ticket erstellt: {ticket_channel.mention}", ephemeral=True)
+        await interaction.response.send_message(f"✅ Dein Ticket wurde erstellt: {ticket_channel.mention}", ephemeral=True)
 
         embed = discord.Embed(
-            title=f"Ticket: {category_name}",
+            title=f"Ticket: {selected_label}",
             description=f"Hallo {interaction.user.mention}!\nDanke für deine Anfrage. Ein Teammitglied wird sich gleich bei dir melden.",
             color=discord.Color.blue()
         )
         embed.add_field(name="Status", value="❌ Noch nicht beansprucht", inline=False)
         
-        # Wir speichern die min_role_id im View, damit der Claim-Button weiß, wer Zugriff hat
         await ticket_channel.send(embed=embed, view=TicketControlView(min_role_id))
 
 class TicketControlView(discord.ui.View):
@@ -78,7 +85,7 @@ class TicketControlView(discord.ui.View):
 
     @discord.ui.button(label="Ticket schließen", style=discord.ButtonStyle.red, custom_id="close_ticket_btn", emoji="🔒")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🔒 Lösche Ticket in 5s...", ephemeral=True)
+        await interaction.response.send_message("🔒 Ticket wird in 5 Sekunden gelöscht...", ephemeral=True)
         await asyncio.sleep(5)
         await interaction.channel.delete()
 
