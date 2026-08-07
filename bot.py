@@ -21,6 +21,7 @@ def run_flask():
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.dm_messages = True  # Wichtig für die DM-Fragen bei Bewerbungen
 
 class MyBot(commands.Bot):
     def __init__(self):
@@ -35,10 +36,10 @@ class MyBot(commands.Bot):
             except Exception as e:
                 print(f"Fehler beim Laden von {ext}: {e}")
 
-        # Views registrieren
+        # Views registrieren (BewerbungView benötigt den bot als Argument 'self')
         self.add_view(TicketView())
         self.add_view(CloseTicketView())
-        self.add_view(BewerbungView())
+        self.add_view(BewerbungView(self))
         print("Persistente Views registriert!")
 
         await self.tree.sync()
@@ -58,7 +59,6 @@ async def on_ready():
     if ticket_channel:
         exists = False
         async for message in ticket_channel.history(limit=10):
-            # Prüft den Embed-Titel statt des Contents
             if message.embeds and message.embeds[0].title == "🎟️ NRW RP Tickets":
                 exists = True
                 break
@@ -80,7 +80,7 @@ async def on_ready():
                 exists = True
                 break
         if not exists:
-            await bewerbung_channel.send("📝 **Team-Bewerbung**\nKlicke auf den Button unten, um dich zu bewerben:", view=BewerbungView())
+            await bewerbung_channel.send("📝 **Team-Bewerbung**\nKlicke auf den Button unten, um dich zu bewerben:", view=BewerbungView(bot))
             print("Bewerbungs-Panel automatisch gesendet!")
 
 if __name__ == "__main__":
