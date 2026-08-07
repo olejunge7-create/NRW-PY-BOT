@@ -34,17 +34,17 @@ class RanksCog(commands.Cog):
     @discord.app_commands.describe(member="Der Benutzer", new_role="Die neue Rang-Rolle", reason="Grund für die Beförderung")
     @discord.app_commands.checks.has_permissions(manage_roles=True)
     async def uprank(self, interaction: discord.Interaction, member: discord.Member, new_role: discord.Role, reason: str):
+        # Sofort dem Timeout vorbeugen
+        await interaction.response.defer(ephemeral=False)
+
         try:
-            # Finde die alte Rang-Rolle heraus, bevor wir sie löschen
             old_roles = [r for r in member.roles if r.id in RANK_ROLES]
             old_role_name = old_roles[0].name if old_roles else "Kein Rang"
 
-            # Alte Rollen entfernen & neue geben
             if old_roles:
                 await member.remove_roles(*old_roles)
             await member.add_roles(new_role)
 
-            # Embed im gewünschten Design erstellen
             embed = discord.Embed(color=discord.Color.green())
             embed.description = (
                 f"╭────────────────────────╮\n"
@@ -58,14 +58,17 @@ class RanksCog(commands.Cog):
             )
             embed.set_footer(text=f"Durchgeführt von {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
 
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
         except discord.Forbidden:
-            await interaction.response.send_message("❌ Mir fehlen die Berechtigungen, diese Rollen zu ändern.", ephemeral=True)
+            await interaction.followup.send("❌ Mir fehlen die Berechtigungen, diese Rollen zu ändern.", ephemeral=True)
 
     @discord.app_commands.command(name="downrank", description="Degradiert einen Benutzer mit schickem Embed.")
     @discord.app_commands.describe(member="Der Benutzer", new_role="Die neue Rang-Rolle", reason="Grund für die Degradierung")
     @discord.app_commands.checks.has_permissions(manage_roles=True)
     async def downrank(self, interaction: discord.Interaction, member: discord.Member, new_role: discord.Role, reason: str):
+        # Sofort dem Timeout vorbeugen
+        await interaction.response.defer(ephemeral=False)
+
         try:
             old_roles = [r for r in member.roles if r.id in RANK_ROLES]
             old_role_name = old_roles[0].name if old_roles else "Kein Rang"
@@ -87,9 +90,9 @@ class RanksCog(commands.Cog):
             )
             embed.set_footer(text=f"Durchgeführt von {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
 
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
         except discord.Forbidden:
-            await interaction.response.send_message("❌ Mir fehlen die Berechtigungen, diese Rollen zu ändern.", ephemeral=True)
+            await interaction.followup.send("❌ Mir fehlen die Berechtigungen, diese Rollen zu ändern.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(RanksCog(bot))
