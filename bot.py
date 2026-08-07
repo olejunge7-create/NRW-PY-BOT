@@ -21,7 +21,7 @@ def run_flask():
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-intents.dm_messages = True  # Wichtig für die DM-Fragen bei Bewerbungen
+intents.dm_messages = True
 
 class MyBot(commands.Bot):
     def __init__(self):
@@ -53,6 +53,7 @@ async def on_ready():
     
     TICKET_CHANNEL_ID = 1534325339369635991
     BEWERBUNG_CHANNEL_ID = 1534579610497581180
+    REGEL_CHANNEL_ID = 1534624451662970920
     
     # 1. Automatisches Ticket-Panel
     ticket_channel = bot.get_channel(TICKET_CHANNEL_ID)
@@ -87,6 +88,55 @@ async def on_ready():
             )
             await bewerbung_channel.send(embed=embed, view=BewerbungView(bot))
             print("Bewerbungs-Panel automatisch gesendet!")
+
+    # 3. Automatisches Regelwerk-Embed
+    regeln_channel = bot.get_channel(REGEL_CHANNEL_ID)
+    if regeln_channel:
+        exists = False
+        async for message in regeln_channel.history(limit=10):
+            if message.embeds and message.embeds[0].title == "📜 Notruf Emden – Regelwerk":
+                exists = True
+                break
+        if not exists:
+            embed = discord.Embed(
+                title="📜 Notruf Emden – Regelwerk",
+                description="**Willkommen auf Notruf Emden – Midcore Roleplay!**\nHier ist unser offizielles Regelwerk. Bitte lies es dir sorgfältig durch.",
+                color=discord.Color.from_rgb(0, 150, 255)
+            )
+            
+            embed.add_field(
+                name="§1 - §3 Allgemeines & RP-Pflicht & FailRP",
+                value="• **Allgemeines:** Mit Betreten akzeptierst du die Regeln. Respekt ist Pflicht. Keine Support-Diskussionen im RP. Bugusing verboten.\n• **Roleplay-Pflicht:** Midcore-RP ist Pflicht. RP steht vor dem Gewinnen.\n• **FailRP:** Unrealistische Handlungen und Zerstörung von Situationen verboten.",
+                inline=False
+            )
+            embed.add_field(
+                name="§4 - §6 RDM, VDM & FearRP",
+                value="• **RDM:** Angreifen oder Töten ohne RP-Hintergrund ist verboten.\n• **VDM:** Fahrzeuge dürfen nicht als Waffen genutzt werden.\n• **FearRP:** Du musst Waffen ernst nehmen und bei Lebensgefahr reagieren.",
+                inline=False
+            )
+            embed.add_field(
+                name="§7 - §9 CrashRP, Combat Logging & Metagaming",
+                value="• **CrashRP:** Unfälle realistisch ausspielen, Rettungsdienst rufen.\n• **Combat Logging:** Server während Situationen zu verlassen ist verboten.\n• **Metagaming:** OOC-/Discord-Infos im RP zu nutzen ist verboten.",
+                inline=False
+            )
+            embed.add_field(
+                name="§10 - §12 PowerRP, NLR & Polizei",
+                value="• **PowerRP:** Andere zu unfairen Handlungen zwingen verboten.\n• **NLR:** Nach RP-Tod keine Erinnerung oder sofortige Rückkehr.\n• **Polizei:** Muss realistisch und verhältnismäßig handeln.",
+                inline=False
+            )
+            embed.add_field(
+                name="§13 - §16 Rettungsdienst, Feuerwehr, Funk & Fahrzeuge",
+                value="• **Rettungsdienst & Feuerwehr:** Realistisches RP, faire Behandlung.\n• **Funk:** Hohe Funkdisziplin einhalten.\n• **Fahrzeuge:** Keine absichtlichen Rammaktionen.",
+                inline=False
+            )
+            embed.add_field(
+                name="§17 - §20 Trolling, Werbung, Team & Strafen",
+                value="• **Trolling & Werbung:** Stören und Fremdwerbung verboten.\n• **Team:** Anweisungen sind Folge zu leisten.\n• **Strafen:** Verwarnung, Kick, Temp-Bann oder Permanenter Bann.\n\n*Realistisches Roleplay sorgt für mehr Spielspaß!*",
+                inline=False
+            )
+            
+            await regeln_channel.send(embed=embed)
+            print("Regelwerk-Embed automatisch gesendet!")
 
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask)
