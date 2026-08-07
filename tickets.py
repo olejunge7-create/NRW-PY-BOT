@@ -28,15 +28,12 @@ ROLE_HIERARCHY = [
 ]
 
 def get_roles_from_threshold(guild, threshold_role_id):
-    """Gibt die Schwellenrolle und alle Rollen darüber aus der Hierarchie zurück"""
     try:
         threshold_index = ROLE_HIERARCHY.index(threshold_role_id)
     except ValueError:
         return []
     
-    # Nimm alle Rollen ab dem Index bis zum Ende der Liste
     valid_ids = ROLE_HIERARCHY[threshold_index:]
-    
     allowed_roles = []
     for r_id in valid_ids:
         role = guild.get_role(r_id)
@@ -58,7 +55,6 @@ class TicketSelect(discord.ui.Select):
         guild = interaction.guild
         selected_label = self.values[0]
         
-        # Weist jeder Kategorie die exakte Start-Rollen-ID aus deiner Liste zu:
         if selected_label == "Support & Fragen":
             min_role_id = 1534325338182520992  # Rang 2
         elif selected_label == "Sonstiges":
@@ -76,7 +72,6 @@ class TicketSelect(discord.ui.Select):
             guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
         }
 
-        # Füge alle berechtigten Rollen hinzu
         allowed_roles = get_roles_from_threshold(guild, min_role_id)
         for role in allowed_roles:
             overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
@@ -93,10 +88,11 @@ class TicketSelect(discord.ui.Select):
         )
         embed.add_field(name="Status", value="❌ Noch nicht beansprucht", inline=False)
         
-        await ticket_channel.send(embed=embed, view=TicketControlView(min_role_id))
+        await ticket_channel.send(embed=embed, view=CloseTicketView(min_role_id))
 
-class TicketControlView(discord.ui.View):
-    def __init__(self, min_role_id):
+# Hier heißt die Klasse wieder exakt CloseTicketView, damit bot.py sie findet
+class CloseTicketView(discord.ui.View):
+    def __init__(self, min_role_id=ROLE_HIERARCHY[0]):
         super().__init__(timeout=None)
         self.min_role_id = min_role_id
 
