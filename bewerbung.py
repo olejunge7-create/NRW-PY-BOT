@@ -2,74 +2,101 @@ import discord
 from discord.ext import commands
 import asyncio
 
-QUESTIONS = [
-    "Wie alt bist du?",
-    "Welche Erfahrungen hast du bereits gesammelt?",
-    "Warum möchtest du in unser Team?",
-    "Wie viel Zeit kannst du pro Woche investieren?"
-]
+TEAMLEITUNG_ROLE_ID = 1534325338199556145
+BEWERBUNG_LOG_CHANNEL_ID = 1534552376911073451
 
-class BewerbungModal(discord.ui.Modal, title="Team-Bewerbung"):
-    def __init__(self):
-        super().__init__()
-        self.reason = discord.ui.TextInput(
-            label="Deine Motivation / Kurze Info",
-            style=discord.TextStyle.long,
-            placeholder="Schreibe hier kurz etwas...",
-            required=True,
-            max_length=300
-        )
-        self.add_item(self.reason)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Check deine Privatnachrichten (DMs), um die Fragen zu beantworten!", ephemeral=True)
-        
-        user = interaction.user
-        try:
-            dm_channel = await user.create_dm()
-            await dm_channel.send("👋 Hallo! Schön, dass du dich bewirbst. Ich stelle dir jetzt ein paar Fragen nacheinander. Antworte einfach hier im Chat darauf.")
-        except discord.Forbidden:
-            return
-
-        answers = []
-        for i, q in enumerate(QUESTIONS):
-            await dm_channel.send(f"**Frage {i+1} von {len(QUESTIONS)}:**\n{q}")
-            
-            def check(m):
-                return m.author == user and isinstance(m.channel, discord.DMChannel)
-
-            try:
-                msg = await interaction.client.wait_for('message', check=check, timeout=300.0)
-                answers.append(msg.content)
-            except asyncio.TimeoutError:
-                await dm_channel.send("❌ Die Bewerbung wurde abgebrochen, da du zu lange (über 5 Minuten) nicht geantwortet hast.")
-                return
-
-        await dm_channel.send("✅ **Vielen Dank!** Deine Bewerbung wurde komplett ausgefüllt und an das Team weitergeleitet.")
-
-        admin_channel = interaction.client.get_channel(1534552376911073451)
-        if admin_channel:
-            embed = discord.Embed(
-                title=f"📝 Neue Bewerbung: {user.display_name}",
-                color=discord.Color.gold()
-            )
-            embed.set_thumbnail(url=user.display_avatar.url)
-            embed.add_field(name="Eingabe aus Modal", value=self.reason.value, inline=False)
-            for i in range(len(QUESTIONS)):
-                embed.add_field(name=QUESTIONS[i], value=answers[i], inline=False)
-            await admin_channel.send(embed=embed)
-
-class BewerbungView(discord.ui.View):
+class BewerbungsEntscheidView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Bewerben", style=discord.ButtonStyle.blurple, custom_id="apply_button_persistent", emoji="📝")
-    async def apply_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(BewerbungModal())
+    def check_permissions(self, interaction: discord.Interaction) -> bool:
+        teamleitung_role = interaction.guild.get_role(TEAMLEITUNG_ROLE_ID)
+        is_admin = interaction.user.guild_permissions.administrator
+        if is_admin: return True
+        if teamleitung_role:
+            return any(r.position >= teamleitung_role.position for r in interaction.user.roles)
+        return False
 
-class BewerbungCog(commands.Cog):
+    @discord.ui.button(label="Annehmen", style=discord.ButtonStyle.green, custom_id="accept_bewerbung", emoji="✅")
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.check_permissions(interaction):
+            await interaction.response.send_message("❌ Nur für Teamleitung!", ephemeral=True)
+            return
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.set_field_at(10, name="Status", value=f"✅ Angenommen von {interaction.user.mention}", inline=False)
+        await interaction.response.edit_message(embed=embed, view=None)
+        await interaction.followup.send("Bewerbung angenommen.")
+
+    @discord.ui.button(label="Ablehnen", style=discord.ButtonStyle.red, custom_id="deny_bewerbung", emoji="❌")
+    async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.check_permissions(interaction):
+            await interaction.response.send_message("❌ Nur für Teamleitung!", ephemeral=True)
+            return
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.red()
+        embed.set_field_at(10, name="Status", value=f"❌ Abgelehnt von {interaction.user.mention}", inline=False)
+        await interaction.response.edit_message(embed=embed, view=None)
+        await interaction.followup.send("Bewerbung abgelehnt.")
+
+class BewerbungButtonView(discord.ui.View):
     def __init__(self, bot):
+        super().__init__(timeout=None)
         self.bot = bot
 
+    @discord.ui.button(label="Jetzt bewerben", style=discord.ButtonStyle.blurple, custom_id="open_bewerbung_dm", emoji="📝")
+    async def open_dm_bewerbung(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user = interaction.user
+        await interaction.response.send_message("📬 Check deine DMs!", ephemeral=True)
+
+        try:
+            dm = await user.create_dm()
+            def check(m): return m.author == user and isinstance(m.channel, discord.DMChannel)
+
+            await dm.send("📝 **Team-Bewerbung (10 Fragen)**")
+            
+            # Fragen-Liste
+            fragen = [
+                ("1/10: Wie ist dein Name?", "name"),
+                ("2/10: Wie alt bist du?", "alter"),
+                ("3/10: Was sind deine Stärken?", "staerken"),
+                ("4/10: Was sind deine Schwächen?", "schwaechen"),
+                ("5/10: Hast du Erfahrung als Teammitglied?", "erfahrung"),
+                ("6/10: Was würdest du bei einem Regelbruch machen?", "regelbruch"),
+                ("7/10: Wie verhältst du dich bei Provokation?", "provokation"),
+                ("8/10: Welche Aufgaben im Team interessieren dich am meisten?", "aufgaben"),
+                ("9/10: Wie viel Zeit hast du in der Woche?", "zeit"),
+                ("10/10: Warum sollten wir dich nehmen? (Bitte schreibe mindestens 300 Wörter!)", "warum_du")
+            ]
+
+            antworten = {}
+            for frage_text, key in fragen:
+                await dm.send(f"**{frage_text}**")
+                msg = await self.bot.wait_for('message', timeout=600.0, check=check)
+                
+                # Wort-Check für Frage 10
+                if key == "warum_du":
+                    wörter = msg.content.split()
+                    if len(wörter) < 300:
+                        await dm.send(f"⚠️ Deine Antwort ist zu kurz ({len(wörter)} Wörter). Wir benötigen mindestens 300 Wörter. Bitte schreibe es nochmal neu:")
+                        msg = await self.bot.wait_for('message', timeout=600.0, check=check)
+                
+                antworten[key] = msg.content
+
+            # Log-Embed
+            embed = discord.Embed(title=f"📝 Neue Bewerbung: {user.name}", color=discord.Color.gold())
+            for frage_text, key in fragen:
+                embed.add_field(name=frage_text, value=antworten[key], inline=False)
+            embed.add_field(name="Status", value="⏳ Ausstehend", inline=False)
+
+            log_channel = interaction.guild.get_channel(BEWERBUNG_LOG_CHANNEL_ID)
+            await log_channel.send(embed=embed, view=BewerbungsEntscheidView())
+            await dm.send("✅ Bewerbung abgeschickt!")
+
+        except asyncio.TimeoutError:
+            await user.send("⏰ Zeit abgelaufen.")
+        except discord.Forbidden:
+            await interaction.followup.send("❌ DMs sind geschlossen!", ephemeral=True)
+
 async def setup(bot):
-    await bot.add_cog(BewerbungCog(bot))
+    await bot.add_cog(commands.Cog(None)) # Platzhalter für Struktur
