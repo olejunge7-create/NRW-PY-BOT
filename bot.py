@@ -4,11 +4,11 @@ import os
 from flask import Flask
 import threading
 
-# Importiere die Views für die Persistenz nach Neustarts
+# Importiere die Views
 from tickets import TicketView, CloseTicketView
 from bewerbung import BewerbungView
 
-# Flask-Server damit Render denkt, es ist ein Web Service mit offenem Port
+# Flask-Server für Render
 app = Flask(__name__)
 
 @app.route('/')
@@ -37,15 +37,15 @@ class MyBot(commands.Bot):
             except Exception as e:
                 print(f"Fehler beim Laden von {ext}: {e}")
 
-        # WICHTIG: Views beim Start registrieren, damit Buttons nach Neustart nicht ablaufen!
+        # Views für Persistenz registrieren
         self.add_view(TicketView())
         self.add_view(CloseTicketView())
         self.add_view(BewerbungView())
-        print("Persistente Views erfolgreich registriert!")
+        print("Persistente Views registriert!")
 
         # Slash-Befehle synchronisieren
         await self.tree.sync()
-        print("Slash-Befehle erfolgreich synchronisiert!")
+        print("Slash-Befehle synchronisiert!")
 
 bot = MyBot()
 
@@ -53,18 +53,23 @@ bot = MyBot()
 async def on_ready():
     print(f"Eingeloggt als {bot.user}!")
 
-@bot.tree.command(name="setup_panels", description="Sendet die Ticket- und Bewerbungs-Panels in den aktuellen Kanal.")
+# Neuer Befehl nur für Tickets
+@bot.tree.command(name="setup_ticket", description="Sendet das Ticket-Panel.")
 @discord.app_commands.checks.has_permissions(administrator=True)
-async def setup_panels(interaction: discord.Interaction):
-    await interaction.response.send_message("✅ Panels werden erstellt...", ephemeral=True)
+async def setup_ticket(interaction: discord.Interaction):
+    await interaction.response.send_message("✅ Ticket-Panel wird erstellt...", ephemeral=True)
     await interaction.channel.send("🎫 **Support-Ticket erstellen**\nKlicke auf den Button unten, um ein Ticket zu öffnen:", view=TicketView())
+
+# Neuer Befehl nur für Bewerbungen
+@bot.tree.command(name="setup_bewerbung", description="Sendet das Bewerbungs-Panel.")
+@discord.app_commands.checks.has_permissions(administrator=True)
+async def setup_bewerbung(interaction: discord.Interaction):
+    await interaction.response.send_message("✅ Bewerbungs-Panel wird erstellt...", ephemeral=True)
     await interaction.channel.send("📝 **Team-Bewerbung**\nKlicke auf den Button unten, um dich zu bewerben:", view=BewerbungView())
 
 if __name__ == "__main__":
-    # Flask-Server im Hintergrund starten
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
 
-    # Bot starten
     bot.run(os.getenv("DISCORD_TOKEN"))
