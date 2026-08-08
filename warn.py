@@ -1,109 +1,65 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import json
 import os
 
-WARNINGS_FILE = "warnings.json"
+WARN_FILE = "warns.json"
 
-def load_warnings():
-    if os.path.exists(WARNINGS_FILE):
+def load_warns():
+    if os.path.exists(WARN_FILE):
         try:
-            with open(WARNINGS_FILE, "r") as f:
+            with open(WARN_FILE, "r") as f:
                 return json.load(f)
-        except Exception:
+        except:
             return {}
     return {}
 
-def save_warnings(data):
-    with open(WARNINGS_FILE, "w") as f:
+def save_warns(data):
+    with open(WARN_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
 class WarnCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @discord.app_commands.command(name="warn", description="Verwarnt einen Benutzer.")
-    @discord.app_commands.describe(member="Der Benutzer, der verwarnt werden soll", reason="Der Grund für die Verwarnung")
-    @discord.app_commands.checks.has_permissions(moderate_members=True)
-    async def warn(self, interaction: discord.Interaction, member: discord.Member, reason: str):
-        warnings = load_warnings()
-        guild_id = str(interaction.guild.id)
-        user_id = str(member.id)
-
-        if guild_id not in warnings:
-            warnings[guild_id] = {}
-        if user_id not in warnings[guild_id]:
-            warnings[guild_id][user_id] = []
-
-        warnings[guild_id][user_id].append({
-            "reason": reason,
-            "moderator": str(interaction.user)
-        })
-
-        save_warnings(warnings)
-
-        total_warns = len(warnings[guild_id][user_id])
-
+    @app_commands.command(name="warn", description="Verwarne einen User.")
+    @app_commands.describe(user="Der User", grund="Der Grund für den Warn")
+    async def warn(self, interaction: discord.Interaction, user: discord.Member, grund: str):
+        data = load_warns()
+        user_id_str = str(user.id)
+        
+        if user_id_str not in data:
+            data[user_id_str] = []
+            
+        data[user_id_str].append(grund)
+        save_warns(data)
+        
         embed = discord.Embed(
-            title="⚠️ Verwarnung erhalten",
-            description=f"Du wurdest auf **{interaction.guild.name}** verwarnt.",
+            title="⚠️ User verwarnt",
+            description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** {len(data[user_id_str])}",
             color=discord.Color.orange()
         )
-        embed.add_field(name="Grund", value=reason, inline=False)
-        embed.add_field(name="Anzahl Verwarnungen", value=str(total_warns), inline=False)
+        await interaction.response.send_message(embed=embed)
 
-        try:
-            await member.send(embed=embed)
-        except discord.Forbidden:
-            pass
-
-        await interaction.response.send_message(f"✅ {member.mention} wurde erfolgreich verwarnt! (Gesamt: {total_warns})", ephemeral=True)
-
-    @discord.app_commands.command(name="unwarn", description="Entfernt eine bestimmte Verwarnung von einem Benutzer.")
-    @discord.app_commands.describe(member="Der Benutzer", warn_index="Die Nummer der Warnung (siehe /warnings)")
-    @discord.app_commands.checks.has_permissions(moderate_members=True)
-    async def unwarn(self, interaction: discord.Interaction, member: discord.Member, warn_index: int):
-        warnings = load_warnings()
-        guild_id = str(interaction.guild.id)
-        user_id = str(member.id)
-
-        user_warns = warnings.get(guild_id, {}).get(user_id, [])
-
-        if not user_warns or warn_index < 1 or warn_index > len(user_warns):
-            await interaction.response.send_message(f"❌ Ungültige Warn-Nummer! {member.mention} hat keine Warnung mit der Nummer #{warn_index}.", ephemeral=True)
+    @app_commands.command(name="warns", description="Zeige die Warns eines Users an.")
+    @app_commands.describe(user="Der User")
+    async def warns(self, interaction: discord.Interaction, user: discord.Member):
+        data = load_warns()
+        user_id_str = str(user.id)
+        
+        if user_id_str not in data or not data[user_id_str]:
+            await interaction.response.send_message(f"✅ {user.mention} hat keine Verwarnungen.", ephemeral=True)
             return
-
-        # Da Listen bei 0 anfangen, ziehen wir 1 ab
-        removed = user_warns.pop(warn_index - 1)
-        save_warnings(warnings)
-
-        await interaction.response.send_message(f"✅ Warnung #{warn_index} von {member.mention} wurde erfolgreich entfernt!\n**Entfernter Grund:** {removed['reason']}", ephemeral=True)
-
-    @discord.app_commands.command(name="warnings", description="Zeigt die Verwarnungen eines Benutzers an.")
-    @discord.app_commands.describe(member="Der Benutzer, dessen Verwarnungen du sehen möchtest")
-    async def warnings(self, interaction: discord.Interaction, member: discord.Member):
-        warnings = load_warnings()
-        guild_id = str(interaction.guild.id)
-        user_id = str(member.id)
-
-        user_warns = warnings.get(guild_id, {}).get(user_id, [])
-
-        if not user_warns:
-            await interaction.response.send_message(f"{member.mention} hat keine Verwarnungen.", ephemeral=True)
-            return
-
+            
+        user_warns = data[user_id_str]
+        warn_text = "\n".join([f"{i+1}. {w}" for i, w in enumerate(user_warns)])
+        
         embed = discord.Embed(
-            title=f"⚠️ Verwarnungen für {member.display_name}",
+            title=f"⚠️ Verwarnungen von {user.name}",
+            description=warn_text,
             color=discord.Color.red()
         )
-
-        for i, w in enumerate(user_warns, 1):
-            embed.add_field(
-                name=f"Warnung #{i}",
-                value=f"**Grund:** {w['reason']}\n**Von:** {w['moderator']}",
-                inline=False
-            )
-
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def setup(bot):
