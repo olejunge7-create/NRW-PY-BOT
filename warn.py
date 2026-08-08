@@ -9,15 +9,16 @@ WARN_FILE = "warns.json"
 def load_warns():
     if os.path.exists(WARN_FILE):
         try:
-            with open(WARN_FILE, "r") as f:
+            with open(WARN_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
+        except Exception as e:
+            print(f"Fehler beim Laden der Warns: {e}")
             return {}
     return {}
 
 def save_warns(data):
-    with open(WARN_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+    with open(WARN_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 class WarnCog(commands.Cog):
     def __init__(self, bot):
@@ -29,15 +30,19 @@ class WarnCog(commands.Cog):
         data = load_warns()
         user_id_str = str(user.id)
         
+        # Sicherstellen, dass die Liste für den User existiert
         if user_id_str not in data:
             data[user_id_str] = []
             
+        # Warnung zur Liste hinzufügen
         data[user_id_str].append(grund)
         save_warns(data)
         
+        anzahl = len(data[user_id_str])
+        
         embed = discord.Embed(
             title="⚠️ User verwarnt",
-            description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** {len(data[user_id_str])}",
+            description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** {anzahl}",
             color=discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
@@ -53,10 +58,10 @@ class WarnCog(commands.Cog):
             return
             
         user_warns = data[user_id_str]
-        warn_text = "\n".join([f"{i+1}. {w}" for i, w in enumerate(user_warns)])
+        warn_text = "\n".join([f"• {w}" for i, w in enumerate(user_warns)])
         
         embed = discord.Embed(
-            title=f"⚠️ Verwarnungen von {user.name}",
+            title=f"⚠️ Verwarnungen von {user.name} (Gesamt: {len(user_warns)})",
             description=warn_text,
             color=discord.Color.red()
         )
