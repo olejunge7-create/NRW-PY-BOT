@@ -28,7 +28,8 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        extensions = ["tickets", "bewerbung", "warn", "ranks", "regeln"]
+        # "fraktionen" wurde hier zur Liste hinzugefügt!
+        extensions = ["tickets", "bewerbung", "warn", "ranks", "regeln", "fraktionen"]
         for ext in extensions:
             try:
                 await self.load_extension(ext)
