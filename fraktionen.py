@@ -51,10 +51,11 @@ class FraktionCog(commands.Cog):
     @app_commands.command(name="addfrak", description="Füge eine neue Fraktion hinzu.")
     @app_commands.describe(name="Name der Fraktion", besitzer="Name oder Mention des Besitzers", link="Discord Einladungslink")
     async def addfrak(self, interaction: discord.Interaction, name: str, besitzer: str, link: str):
+        await interaction.response.defer(ephemeral=True)
         data = load_fraktionen()
         
         if name in data:
-            await interaction.response.send_message(f"❌ Die Fraktion **{name}** existiert bereits!", ephemeral=True)
+            await interaction.followup.send(f"❌ Die Fraktion **{name}** existiert bereits!", ephemeral=True)
             return
             
         data[name] = {
@@ -68,26 +69,28 @@ class FraktionCog(commands.Cog):
         embed.add_field(name="Fraktion", value=name, inline=True)
         embed.add_field(name="Besitzer", value=besitzer, inline=True)
         embed.add_field(name="Discord", value=link, inline=False)
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="delfrak", description="Lösche eine Fraktion komplett.")
     @app_commands.describe(name="Name der Fraktion")
     async def delfrak(self, interaction: discord.Interaction, name: str):
+        await interaction.response.defer(ephemeral=True)
         data = load_fraktionen()
         if name in data:
             del data[name]
             save_fraktionen(data)
-            await interaction.response.send_message(f"🗑️ Die Fraktion **{name}** wurde gelöscht.", ephemeral=True)
+            await interaction.followup.send(f"🗑️ Die Fraktion **{name}** wurde gelöscht.", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ Fraktion nicht gefunden.", ephemeral=True)
+            await interaction.followup.send("❌ Fraktion nicht gefunden.", ephemeral=True)
 
     @app_commands.command(name="frakwarn", description="Verwarne eine Fraktion (Max 3/3).")
     @app_commands.describe(name="Name der Fraktion", grund="Grund für den Warn", tage="Wie viele Tage gültig")
     async def frakwarn(self, interaction: discord.Interaction, name: str, grund: str, tage: int):
+        await interaction.response.defer()
         data = load_fraktionen()
         
         if name not in data:
-            await interaction.response.send_message(f"❌ Die Fraktion **{name}** wurde nicht gefunden! Erstelle sie zuerst mit `/addfrak`.", ephemeral=True)
+            await interaction.followup.send(f"❌ Die Fraktion **{name}** wurde nicht gefunden! Erstelle sie zuerst mit `/addfrak`.", ephemeral=True)
             return
             
         ablauf = datetime.now() + timedelta(days=tage)
@@ -95,10 +98,9 @@ class FraktionCog(commands.Cog):
         
         anzahl = len(data[name]["warns"])
         
-        # Wenn 3/3 Warns erreicht sind -> alle Warns zurücksetzen (oder Konsequenz)
         status_text = f"Anzahl Warns: **{anzahl}/3**"
         if anzahl >= 3:
-            data[name]["warns"] = [] # Zurücksetzen auf 0
+            data[name]["warns"] = []
             status_text = "🔴 **Limit 3/3 erreicht!** Alle Warns wurden zurückgesetzt (Frak-Sanktion fällig)."
             
         save_fraktionen(data)
@@ -108,13 +110,14 @@ class FraktionCog(commands.Cog):
         embed.add_field(name="Stand", value=status_text, inline=True)
         embed.add_field(name="Grund", value=grund, inline=False)
         embed.add_field(name="Gültigkeit", value=f"{tage} Tage (bis {ablauf.strftime('%d.%m.%Y')})", inline=False)
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="frakliste", description="Zeigt die große Fraktions- und Info-Liste.")
     async def frakliste(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         data = load_fraktionen()
         if not data:
-            await interaction.response.send_message("✅ Aktuell sind keine Fraktionen eingetragen.", ephemeral=True)
+            await interaction.followup.send("✅ Aktuell sind keine Fraktionen eingetragen.", ephemeral=True)
             return
             
         embed = discord.Embed(title="📋 Offizielle Fraktions- & Info-Liste", color=discord.Color.from_rgb(0, 150, 255))
@@ -123,12 +126,11 @@ class FraktionCog(commands.Cog):
             warns = info.get("warns", [])
             anzahl = len(warns)
             
-            # Warn-Text zusammenbauen
             if anzahl == 0:
                 warn_text = "✅ Keine Warns (0/3)"
             else:
                 warn_text = f"⚠️ **{anzahl}/3 Warns**\n"
-                for i, w in enumerate(warns):
+                for w in warns:
                     warn_text += f"• {w['grund']} *(Läuft ab: {w['ablauf'][:10]})*\n"
             
             value_str = f"👑 **Besitzer:** {info.get('besitzer', 'Unbekannt')}\n" \
@@ -137,7 +139,7 @@ class FraktionCog(commands.Cog):
             
             embed.add_field(name=f"📌 {name}", value=value_str, inline=False)
             
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(FraktionCog(bot))
