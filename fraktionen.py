@@ -65,10 +65,13 @@ class FraktionCog(commands.Cog):
         }
         save_fraktionen(data)
         
-        embed = discord.Embed(title="✅ Fraktion hinzugefügt", color=discord.Color.green())
-        embed.add_field(name="Fraktion", value=name, inline=True)
-        embed.add_field(name="Besitzer", value=besitzer, inline=True)
-        embed.add_field(name="Discord", value=link, inline=False)
+        embed = discord.Embed(
+            title="🏢 Neue Fraktion registriert",
+            description=f"Die Fraktion **{name}** wurde erfolgreich hinzugefügt.",
+            color=discord.Color.green()
+        )
+        embed.add_field(name="👑 Leitung", value=besitzer, inline=True)
+        embed.add_field(name="🔗 Discord", value=f"[Zum Discord-Server]({link})", inline=True)
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="delfrak", description="Lösche eine Fraktion komplett.")
@@ -90,7 +93,7 @@ class FraktionCog(commands.Cog):
         data = load_fraktionen()
         
         if name not in data:
-            await interaction.followup.send(f"❌ Die Fraktion **{name}** wurde nicht gefunden! Erstelle sie zuerst mit `/addfrak`.", ephemeral=True)
+            await interaction.followup.send(f"❌ Die Fraktion **{name}** wurde nicht gefunden!", ephemeral=True)
             return
             
         ablauf = datetime.now() + timedelta(days=tage)
@@ -98,46 +101,54 @@ class FraktionCog(commands.Cog):
         
         anzahl = len(data[name]["warns"])
         
-        status_text = f"Anzahl Warns: **{anzahl}/3**"
+        status_text = f"⚠️ **{anzahl}/3 Warns aktiv**"
         if anzahl >= 3:
             data[name]["warns"] = []
-            status_text = "🔴 **Limit 3/3 erreicht!** Alle Warns wurden zurückgesetzt (Frak-Sanktion fällig)."
+            status_text = "🔴 **3/3 Limit erreicht!** Warns wurden zurückgesetzt (Sanktion folgt)."
             
         save_fraktionen(data)
         
-        embed = discord.Embed(title="⚠️ Fraktions-Verwarnung", color=discord.Color.red())
-        embed.add_field(name="Fraktion", value=name, inline=True)
-        embed.add_field(name="Stand", value=status_text, inline=True)
+        embed = discord.Embed(
+            title=f"⚠️ Offizielle Verwarnung: {name}",
+            color=discord.Color.red()
+        )
         embed.add_field(name="Grund", value=grund, inline=False)
-        embed.add_field(name="Gültigkeit", value=f"{tage} Tage (bis {ablauf.strftime('%d.%m.%Y')})", inline=False)
+        embed.add_field(name="Gültigkeit", value=f"{tage} Tage (Gültig bis: {ablauf.strftime('%d.%m.%Y')})", inline=True)
+        embed.add_field(name="Aktueller Status", value=status_text, inline=True)
         await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="frakliste", description="Zeigt die große Fraktions- und Info-Liste.")
+    @app_commands.command(name="frakliste", description="Zeigt die offizielle Fraktionsübersicht.")
     async def frakliste(self, interaction: discord.Interaction):
         await interaction.response.defer()
         data = load_fraktionen()
         if not data:
-            await interaction.followup.send("✅ Aktuell sind keine Fraktionen eingetragen.", ephemeral=True)
+            await interaction.followup.send("Aktuell sind keine Fraktionen eingetragen.", ephemeral=True)
             return
             
-        embed = discord.Embed(title="📋 Offizielle Fraktions- & Info-Liste", color=discord.Color.from_rgb(0, 150, 255))
+        embed = discord.Embed(
+            title="⚡ STAATLICHE & ZIVILE FRAKTIONEN",
+            description="Übersicht aller registrierten Fraktionen, Leitungen und des aktuellen Status.",
+            color=discord.Color.from_rgb(30, 144, 255)
+        )
         
         for name, info in data.items():
             warns = info.get("warns", [])
             anzahl = len(warns)
             
             if anzahl == 0:
-                warn_text = "✅ Keine Warns (0/3)"
+                warn_text = "Keine (0/3)"
             else:
-                warn_text = f"⚠️ **{anzahl}/3 Warns**\n"
+                warn_text = f"**{anzahl}/3 Warns**\n"
                 for w in warns:
-                    warn_text += f"• {w['grund']} *(Läuft ab: {w['ablauf'][:10]})*\n"
+                    warn_text += f"• {w['grund']} *(bis {w['ablauf'][:10]})*\n"
             
-            value_str = f"👑 **Besitzer:** {info.get('besitzer', 'Unbekannt')}\n" \
-                        f"🔗 **Discord:** {info.get('link', 'Kein Link')}\n" \
-                        f"🛡️ **Status:** {warn_text}"
+            value_block = (
+                f"• **Leitung:** {info.get('besitzer', 'Unbekannt')}\n"
+                f"• **Discord:** {info.get('link', 'Kein Link')}\n"
+                f"• **Warns:** {warn_text}"
+            )
             
-            embed.add_field(name=f"📌 {name}", value=value_str, inline=False)
+            embed.add_field(name=f"🔹 {name}", value=value_block, inline=False)
             
         await interaction.followup.send(embed=embed)
 
