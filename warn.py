@@ -7,8 +7,9 @@ import os
 WARN_FILE = "warns.json"
 memory_warns = {}
 
-# Deine 21 Team-Rollen-IDs
+# Alle Team-Rollen-IDs (inklusive der 2 neuen)
 TEAM_ROLLEN_IDS = [
+    1534325338182520990,  # Neu hinzugefügt
     1534325338182520991,  # Rang 1
     1534325338182520992,  # Rang 2
     1534325338182520993,  # Rang 3
@@ -17,6 +18,7 @@ TEAM_ROLLEN_IDS = [
     1534325338199556138,  # Rang 6
     1534325338199556139,  # Rang 7
     1534325338199556140,  # Rang 8
+    1534325338199556141,  # Neu hinzugefügt
     1534325338199556142,  # Rang 9
     1534325338199556143,  # Rang 10
     1534325338199556145,  # Rang 11
