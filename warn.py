@@ -5,8 +5,6 @@ import json
 import os
 
 WARN_FILE = "warns.json"
-
-# Wir speichern die Warns zur Sicherheit auch direkt im Arbeitsspeicher des Bot-Prozesses
 memory_warns = {}
 
 def load_warns():
@@ -27,12 +25,11 @@ def save_warns(data):
         with open(WARN_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        print(f"Fehler beim Speichern (vielleicht schreibgeschützter Pfad): {e}")
+        print(f"Fehler beim Speichern: {e}")
 
 class WarnCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Direkt beim Start laden
         load_warns()
 
     @app_commands.command(name="warn", description="Verwarne einen User.")
@@ -45,14 +42,29 @@ class WarnCog(commands.Cog):
             data[user_id_str] = []
             
         data[user_id_str].append(grund)
-        save_warns(data)
-        
         anzahl = len(data[user_id_str])
+        
+        kick_status = ""
+        
+        # Prüfen, ob es der 3. Warn ist
+        if anzahl >= 3:
+            # Alle Warns zurücksetzen
+            data[user_id_str] = []
+            save_warns(data)
+            
+            # Versuchen den User zu kicken
+            try:
+                await user.kick(reason="3/3 Verwarnungen erreicht.")
+                kick_status = "\n\n🔴 **Limit erreicht (3/3):** Alle Warns wurden gelöscht und der User wurde gekickt!"
+            except Exception:
+                kick_status = "\n\n⚠️ **Limit erreicht (3/3):** Warns wurden gelöscht, aber der Bot konnte den User nicht kicken (fehlende Rechte / Höherer Rang)."
+        else:
+            save_warns(data)
         
         embed = discord.Embed(
             title="⚠️ User verwarnt",
-            description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** {anzahl}",
-            color=discord.Color.orange()
+            description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** {anzahl}/3{kick_status}",
+            color=discord.Color.red() if anzahl >= 3 else discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
 
@@ -70,7 +82,7 @@ class WarnCog(commands.Cog):
         warn_text = "\n".join([f"• {w}" for i, w in enumerate(user_warns)])
         
         embed = discord.Embed(
-            title=f"⚠️ Verwarnungen von {user.name} (Gesamt: {len(user_warns)})",
+            title=f"⚠️ Verwarnungen von {user.name} (Gesamt: {len(user_warns)}/3)",
             description=warn_text,
             color=discord.Color.red()
         )
