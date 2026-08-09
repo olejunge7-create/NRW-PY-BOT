@@ -41,30 +41,39 @@ class WarnCog(commands.Cog):
         if user_id_str not in data:
             data[user_id_str] = []
             
+        # Warnung hinzufügen
         data[user_id_str].append(grund)
         anzahl = len(data[user_id_str])
         
         kick_status = ""
         
-        # Prüfen, ob es der 3. Warn ist
+        # Prüfen, ob das Limit von 3 erreicht oder überschritten wurde
         if anzahl >= 3:
-            # Alle Warns zurücksetzen
+            # Warns für diesen User komplett löschen
             data[user_id_str] = []
             save_warns(data)
             
-            # Versuchen den User zu kicken
+            # User kicken
             try:
                 await user.kick(reason="3/3 Verwarnungen erreicht.")
                 kick_status = "\n\n🔴 **Limit erreicht (3/3):** Alle Warns wurden gelöscht und der User wurde gekickt!"
             except Exception:
-                kick_status = "\n\n⚠️ **Limit erreicht (3/3):** Warns wurden gelöscht, aber der Bot konnte den User nicht kicken (fehlende Rechte / Höherer Rang)."
-        else:
-            save_warns(data)
+                kick_status = "\n\n⚠️ **Limit erreicht (3/3):** Warns wurden gelöscht, aber der Bot konnte den User nicht kicken (fehlende Rechte)."
+            
+            embed = discord.Embed(
+                title="⚠️ User verwarnt (Limit erreicht)",
+                description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** 3/3{kick_status}",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed)
+            return
+
+        save_warns(data)
         
         embed = discord.Embed(
             title="⚠️ User verwarnt",
-            description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** {anzahl}/3{kick_status}",
-            color=discord.Color.red() if anzahl >= 3 else discord.Color.orange()
+            description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** {anzahl}/3",
+            color=discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
 
