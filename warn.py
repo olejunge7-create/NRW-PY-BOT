@@ -6,23 +6,34 @@ import os
 
 WARN_FILE = "warns.json"
 
+# Wir speichern die Warns zur Sicherheit auch direkt im Arbeitsspeicher des Bot-Prozesses
+memory_warns = {}
+
 def load_warns():
+    global memory_warns
     if os.path.exists(WARN_FILE):
         try:
             with open(WARN_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                memory_warns.update(data)
         except Exception as e:
-            print(f"Fehler beim Laden der Warns: {e}")
-            return {}
-    return {}
+            print(f"Fehler beim Laden: {e}")
+    return memory_warns
 
 def save_warns(data):
-    with open(WARN_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+    global memory_warns
+    memory_warns = data
+    try:
+        with open(WARN_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"Fehler beim Speichern (vielleicht schreibgeschützter Pfad): {e}")
 
 class WarnCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        # Direkt beim Start laden
+        load_warns()
 
     @app_commands.command(name="warn", description="Verwarne einen User.")
     @app_commands.describe(user="Der User", grund="Der Grund für den Warn")
@@ -30,11 +41,9 @@ class WarnCog(commands.Cog):
         data = load_warns()
         user_id_str = str(user.id)
         
-        # Sicherstellen, dass die Liste für den User existiert
         if user_id_str not in data:
             data[user_id_str] = []
             
-        # Warnung zur Liste hinzufügen
         data[user_id_str].append(grund)
         save_warns(data)
         
