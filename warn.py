@@ -7,6 +7,12 @@ import os
 WARN_FILE = "warns.json"
 memory_warns = {}
 
+# Trage hier die IDs deiner Team-Rollen ein (kannst mehrere mit Komma trennen)
+TEAM_ROLLEN_IDS = [
+    123456789012345678,  # Beispiel-ID für Team-Rolle 1
+    987654321098765432   # Beispiel-ID für Team-Rolle 2
+]
+
 def load_warns():
     global memory_warns
     if os.path.exists(WARN_FILE):
@@ -41,28 +47,32 @@ class WarnCog(commands.Cog):
         if user_id_str not in data:
             data[user_id_str] = []
             
-        # Warnung hinzufügen
         data[user_id_str].append(grund)
         anzahl = len(data[user_id_str])
         
-        kick_status = ""
+        team_status = ""
         
-        # Prüfen, ob das Limit von 3 erreicht oder überschritten wurde
+        # Wenn das Limit von 3 Warns erreicht ist
         if anzahl >= 3:
-            # Warns für diesen User komplett löschen
             data[user_id_str] = []
             save_warns(data)
             
-            # User kicken
-            try:
-                await user.kick(reason="3/3 Verwarnungen erreicht.")
-                kick_status = "\n\n🔴 **Limit erreicht (3/3):** Alle Warns wurden gelöscht und der User wurde gekickt!"
-            except Exception:
-                kick_status = "\n\n⚠️ **Limit erreicht (3/3):** Warns wurden gelöscht, aber der Bot konnte den User nicht kicken (fehlende Rechte)."
+            # Alle Team-Rollen entfernen
+            entfernte_rollen = 0
+            for rolle_id in TEAM_ROLLEN_IDS:
+                role = interaction.guild.get_role(rolle_id)
+                if role and role in user.roles:
+                    try:
+                        await user.remove_roles(role, reason="3/3 Verwarnungen erreicht - Team-Rollen entzogen.")
+                        entfernte_rollen += 1
+                    except Exception:
+                        pass
+            
+            team_status = f"\n\n🔴 **Limit erreicht (3/3):** Warns zurückgesetzt und {entfernte_rollen} Team-Rolle(n) entzogen!"
             
             embed = discord.Embed(
-                title="⚠️ User verwarnt (Limit erreicht)",
-                description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** 3/3{kick_status}",
+                title="⚠️ User verwarnt (Team-Rollen entzogen)",
+                description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** 3/3{team_status}",
                 color=discord.Color.red()
             )
             await interaction.response.send_message(embed=embed)
