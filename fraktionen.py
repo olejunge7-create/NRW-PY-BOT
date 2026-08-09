@@ -7,6 +7,16 @@ from datetime import datetime, timedelta
 
 FRAK_WARN_FILE = "frak_warns.json"
 
+# Deine festen Fraktionen
+FRAKTIONEN = [
+    "NRW Polizei", 
+    "Feuerwehr", 
+    "Medics", 
+    "LSPD", 
+    "Gang", 
+    "Andere"
+]
+
 def load_frak_warns():
     if os.path.exists(FRAK_WARN_FILE):
         with open(FRAK_WARN_FILE, "r", encoding="utf-8") as f:
@@ -20,42 +30,32 @@ def save_frak_warns(data):
 class FraktionCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.check_warns.start() # Startet den automatischen Lösch-Check
+        self.check_warns.start()
 
     def cog_unload(self):
         self.check_warns.cancel()
 
-    # Task läuft alle 60 Minuten und prüft abgelaufene Warns
     @tasks.loop(minutes=60)
     async def check_warns(self):
         data = load_frak_warns()
         changed = False
         now = datetime.now()
-        
         for frak in list(data.keys()):
-            # Filtere nur die Warns, die noch gültig sind
-            valid_warns = []
-            for w in data[frak]:
-                ablauf_datum = datetime.fromisoformat(w["ablauf"])
-                if ablauf_datum > now:
-                    valid_warns.append(w)
-                else:
-                    changed = True
-            
+            valid_warns = [w for w in data[frak] if datetime.fromisoformat(w["ablauf"]) > now]
             if not valid_warns:
                 del data[frak]
-            else:
+                changed = True
+            elif len(valid_warns) != len(data[frak]):
                 data[frak] = valid_warns
-        
-        if changed:
-            save_frak_warns(data)
+                changed = True
+        if changed: save_frak_warns(data)
 
-    @app_commands.command(name="frakwarn", description="Verwarne eine Fraktion (Dauer in Tagen).")
-    @app_commands.describe(fraktion="Name der Fraktion", grund="Grund", tage="Wie viele Tage gültig")
+    # Befehl mit Auswahlmenü für die Fraktionen
+    @app_commands.command(name="frakwarn", description="Verwarne eine Fraktion.")
+    @app_commands.choices(fraktion=[app_commands.Choice(name=f, value=f) for f in FRAKTIONEN])
     async def frakwarn(self, interaction: discord.Interaction, fraktion: str, grund: str, tage: int):
         data = load_frak_warns()
-        if fraktion not in data:
-            data[fraktion] = []
+        if fraktion not in data: data[fraktion] = []
             
         ablauf = datetime.now() + timedelta(days=tage)
         data[fraktion].append({"grund": grund, "ablauf": ablauf.isoformat()})
