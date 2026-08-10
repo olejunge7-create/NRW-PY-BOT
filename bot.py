@@ -7,7 +7,7 @@ import threading
 from tickets import TicketView, CloseTicketView
 from bewerbung import BewerbungView
 
-# Flask-Server für Render
+# Flask-Server für Render (damit Render den Bot als Webdienst aktiv hält)
 app = Flask(__name__)
 
 @app.route('/')
@@ -28,28 +28,33 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
+        # Alle Extensions (Cogs) werden hier geladen
         extensions = ["tickets", "bewerbung", "warn", "ranks", "regeln", "fraktionen", "partner"]
         for ext in extensions:
             try:
                 await self.load_extension(ext)
-                print(f"{ext}-System erfolgreich geladen!")
+                print(f"✅ {ext}-System erfolgreich geladen!")
             except Exception as e:
-                print(f"Fehler beim Laden von {ext}: {e}")
+                print(f"❌ Fehler beim Laden von {ext}: {e}")
 
-        # Views registrieren
+        # Persistente Views für Buttons registrieren
         self.add_view(TicketView())
         self.add_view(CloseTicketView())
         self.add_view(BewerbungView(self))
-        print("Persistente Views registriert!")
+        print("📌 Persistente Views registriert!")
 
-        await self.tree.sync()
-        print("Slash-Befehle synchronisiert!")
+        # Slash-Befehle global mit Discord synchronisieren
+        try:
+            synced = await self.tree.sync()
+            print(f"🚀 {len(synced)} Slash-Befehle erfolgreich synchronisiert!")
+        except Exception as e:
+            print(f"❌ Fehler beim Synchronisieren der Slash-Befehle: {e}")
 
 bot = MyBot()
 
 @bot.event
 async def on_ready():
-    print(f"Eingeloggt als {bot.user}!")
+    print(f"✨ Eingeloggt als {bot.user}!")
     
     TICKET_CHANNEL_ID = 1534325339369635991
     BEWERBUNG_CHANNEL_ID = 1534579610497581180
@@ -70,7 +75,7 @@ async def on_ready():
                 color=discord.Color.purple()
             )
             await ticket_channel.send(embed=embed, view=TicketView())
-            print("Ticket-Panel automatisch gesendet!")
+            print("🎟️ Ticket-Panel automatisch gesendet!")
 
     # 2. Automatisches Bewerbungs-Panel
     bewerbung_channel = bot.get_channel(BEWERBUNG_CHANNEL_ID)
@@ -87,7 +92,7 @@ async def on_ready():
                 color=discord.Color.blue()
             )
             await bewerbung_channel.send(embed=embed, view=BewerbungView(bot))
-            print("Bewerbungs-Panel automatisch gesendet!")
+            print("📝 Bewerbungs-Panel automatisch gesendet!")
 
     # 3. Automatisches Regelwerk-Embed
     regeln_channel = bot.get_channel(REGEL_CHANNEL_ID)
@@ -136,11 +141,13 @@ async def on_ready():
             )
             
             await regeln_channel.send(embed=embed)
-            print("Regelwerk-Embed automatisch gesendet!")
+            print("📜 Regelwerk-Embed automatisch gesendet!")
 
 if __name__ == "__main__":
+    # Flask im Hintergrund starten (für Render)
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
 
+    # Bot starten
     bot.run(os.getenv("DISCORD_TOKEN"))
