@@ -1,35 +1,24 @@
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
-import sqlite3
+import json
+import os
 from datetime import datetime, timedelta
 
-DB_FILE = "fraktionen.db"
+FRAK_FILE = "fraktionen_data.json"
 
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS fraktionen (
-            name TEXT PRIMARY KEY,
-            besitzer TEXT,
-            link TEXT,
-            standort TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS warns (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fraktion TEXT,
-            grund TEXT,
-            ablauf TEXT,
-            FOREIGN KEY (fraktion) REFERENCES fraktionen (name) ON DELETE CASCADE
-        )
-    ''')
-    conn.commit()
-    conn.close()
+def load_fraktionen():
+    if os.path.exists(FRAK_FILE):
+        try:
+            with open(FRAK_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
 
-init_db()
+def save_fraktionen(data):
+    with open(FRAK_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 class FraktionCog(commands.Cog):
     def __init__(self, bot):
@@ -41,30 +30,41 @@ class FraktionCog(commands.Cog):
 
     @tasks.loop(minutes=60)
     async def check_warns(self):
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        now = datetime.now().isoformat()
-        cursor.execute("DELETE FROM warns WHERE ablauf <= ?", (now,))
-        conn.commit()
-        conn.close()
+        data = load_fraktionen()
+        changed = False
+        now = datetime.now()
+        
+        for frak_name, info in data.items():
+            valid_warns = []
+            for w in info.get("warns", []):
+                if datetime.fromisoformat(w["ablauf"]) > now:
+                    valid_warns.append(w)
+                else:
+                    changed = True
+            if len(valid_warns) != len(info.get("warns", [])):
+                info["warns"] = valid_warns
+                changed = True
+                
+        if changed:
+            save_fraktionen(data)
 
     @app_commands.command(name="addfrak", description="Füge eine neue Fraktion hinzu.")
     @app_commands.describe(name="Name der Fraktion", besitzer="Name oder Mention des Besitzers", link="Discord Einladungslink", standort="Standort / Nummer")
     async def addfrak(self, interaction: discord.Interaction, name: str, besitzer: str, link: str, standort: str):
         await interaction.response.defer(ephemeral=True)
+        data = load_fraktionen()
         
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM fraktionen WHERE name = ?", (name,))
-        if cursor.fetchone():
-            conn.close()
+        if name in data:
             await interaction.followup.send(f"❌ Die Fraktion **{name}** existiert bereits!", ephemeral=True)
             return
             
-        cursor.execute("INSERT INTO fraktionen (name, besitzer, link, standort) VALUES (?, ?, ?, ?)", (name, besitzer, link, standort))
-        conn.commit()
-        conn.close()
+        data[name] = {
+            "besitzer": besitzer,
+            "link": link,
+            "standort": standort,
+            "warns": []
+        }
+        save_fraktionen(data)
         
         embed = discord.Embed(
             title="🏢 Fraktion hinzugefügt",
@@ -79,50 +79,34 @@ class FraktionCog(commands.Cog):
     @app_commands.describe(name="Name der Fraktion")
     async def delfrak(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer(ephemeral=True)
-        
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM fraktionen WHERE name = ?", (name,))
-        if not cursor.fetchone():
-            conn.close()
+        data = load_fraktionen()
+        if name in data:
+            del data[name]
+            save_fraktionen(data)
+            await interaction.followup.send(f"🗑️ Die Fraktion **{name}** wurde gelöscht.", ephemeral=True)
+        else:
             await interaction.followup.send("❌ Fraktion nicht gefunden.", ephemeral=True)
-            return
-            
-        cursor.execute("DELETE FROM fraktionen WHERE name = ?", (name,))
-        cursor.execute("DELETE FROM warns WHERE fraktion = ?", (name,))
-        conn.commit()
-        conn.close()
-        
-        await interaction.followup.send(f"🗑️ Die Fraktion **{name}** wurde gelöscht.", ephemeral=True)
 
     @app_commands.command(name="frakwarn", description="Verwarne eine Fraktion (Max 3/3).")
     @app_commands.describe(name="Name der Fraktion", grund="Grund für den Warn", tage="Wie viele Tage gültig")
     async def frakwarn(self, interaction: discord.Interaction, name: str, grund: str, tage: int):
         await interaction.response.defer()
+        data = load_fraktionen()
         
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM fraktionen WHERE name = ?", (name,))
-        if not cursor.fetchone():
-            conn.close()
+        if name not in data:
             await interaction.followup.send(f"❌ Die Fraktion **{name}** wurde nicht gefunden!", ephemeral=True)
             return
             
         ablauf = datetime.now() + timedelta(days=tage)
-        cursor.execute("INSERT INTO warns (fraktion, grund, ablauf) VALUES (?, ?, ?)", (name, grund, ablauf.isoformat()))
+        data[name]["warns"].append({"grund": grund, "ablauf": ablauf.isoformat()})
         
-        cursor.execute("SELECT COUNT(*) FROM warns WHERE fraktion = ?", (name,))
-        anzahl = cursor.fetchone()[0]
-        
+        anzahl = len(data[name]["warns"])
         status_text = f"⚠️ **{anzahl}/3 Warns aktiv**"
         if anzahl >= 3:
-            cursor.execute("DELETE FROM warns WHERE fraktion = ?", (name,))
+            data[name]["warns"] = []
             status_text = "🔴 **3/3 Limit erreicht!** Warns wurden zurückgesetzt."
             
-        conn.commit()
-        conn.close()
+        save_fraktionen(data)
         
         embed = discord.Embed(
             title=f"⚠️ Offizielle Verwarnung: {name}",
@@ -136,15 +120,9 @@ class FraktionCog(commands.Cog):
     @app_commands.command(name="frakliste", description="Zeigt die offizielle Fraktionsliste im Clean-Stil.")
     async def frakliste(self, interaction: discord.Interaction):
         await interaction.response.defer()
+        data = load_fraktionen()
         
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT name, besitzer, link, standort FROM fraktionen")
-        fraktionen = cursor.fetchall()
-        
-        if not fraktionen:
-            conn.close()
+        if not data:
             await interaction.followup.send("Aktuell sind keine Fraktionen eingetragen.", ephemeral=True)
             return
             
@@ -153,29 +131,26 @@ class FraktionCog(commands.Cog):
             color=discord.Color.from_rgb(40, 43, 48)
         )
         
-        for name, besitzer, link, standort in fraktionen:
-            cursor.execute("SELECT grund, ablauf FROM warns WHERE fraktion = ?", (name,))
-            warns = cursor.fetchall()
+        for name, info in data.items():
+            warns = info.get("warns", [])
             anzahl = len(warns)
             
             if anzahl == 0:
                 warn_text = "✅ Keine Warns (0/3)"
             else:
                 warn_text = f"⚠️ **{anzahl}/3 Warns**\n"
-                for grund, ablauf in warns:
-                    warn_text += f"      • {grund} *(bis {ablauf[:10]})*\n"
+                for w in warns:
+                    warn_text += f"      • {w['grund']} *(bis {w['ablauf'][:10]})*\n"
             
-            # Exakter Aufbau wie auf deinem Screenshot
             value_block = (
-                f"> 👑 **Leitung:** {besitzer}\n"
-                f"> 🔗 **Discord:** {link}\n"
-                f"> 📍 **Standort:** {standort}\n"
+                f"> 👑 **Leitung:** {info.get('besitzer', 'Unbekannt')}\n"
+                f"> 🔗 **Discord:** {info.get('link', 'Kein Link')}\n"
+                f"> 📍 **Standort:** {info.get('standort', 'Unbekannt')}\n"
                 f"> 🛡️ **Status:** {warn_text}"
             )
             
             embed.add_field(name=f"✅ {name}", value=value_block, inline=False)
             
-        conn.close()
         await interaction.followup.send(embed=embed)
 
 async def setup(bot):
