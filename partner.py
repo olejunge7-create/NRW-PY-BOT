@@ -7,17 +7,24 @@ import os
 PARTNER_FILE = "partner_data.json"
 
 def load_partner():
-    if os.path.exists(PARTNER_FILE):
-        try:
-            with open(PARTNER_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
+    if not os.path.exists(PARTNER_FILE):
+        return {}
+    try:
+        with open(PARTNER_FILE, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content:
+                return {}
+            return json.loads(content)
+    except Exception as e:
+        print(f"Fehler beim Laden der Partner: {e}")
+        return {}
 
 def save_partner(data):
-    with open(PARTNER_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+    try:
+        with open(PARTNER_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"Fehler beim Speichern der Partner: {e}")
 
 class PartnerCog(commands.Cog):
     def __init__(self, bot):
@@ -27,7 +34,6 @@ class PartnerCog(commands.Cog):
     @app_commands.describe(name="Name des Servers", ansprechpartner="Ansprechpartner / Leitung", link="Discord Einladungslink")
     async def addpartner(self, interaction: discord.Interaction, name: str, ansprechpartner: str, link: str):
         await interaction.response.defer(ephemeral=True)
-        
         data = load_partner()
         
         if name in data:
@@ -53,7 +59,6 @@ class PartnerCog(commands.Cog):
     @app_commands.describe(name="Name des Partners")
     async def delpartner(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer(ephemeral=True)
-        
         data = load_partner()
         if name not in data:
             await interaction.followup.send("❌ Partner nicht gefunden.", ephemeral=True)
@@ -67,8 +72,8 @@ class PartnerCog(commands.Cog):
     @app_commands.command(name="partnerliste", description="Zeigt die offizielle Partner-Liste.")
     async def partnerliste(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        
         data = load_partner()
+        
         if not data:
             await interaction.followup.send("Aktuell sind keine Partnerschaften eingetragen.", ephemeral=True)
             return

@@ -8,17 +8,24 @@ from datetime import datetime, timedelta
 FRAK_FILE = "fraktionen_data.json"
 
 def load_fraktionen():
-    if os.path.exists(FRAK_FILE):
-        try:
-            with open(FRAK_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
+    if not os.path.exists(FRAK_FILE):
+        return {}
+    try:
+        with open(FRAK_FILE, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content:
+                return {}
+            return json.loads(content)
+    except Exception as e:
+        print(f"Fehler beim Laden der Fraktionen: {e}")
+        return {}
 
 def save_fraktionen(data):
-    with open(FRAK_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+    try:
+        with open(FRAK_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"Fehler beim Speichern der Fraktionen: {e}")
 
 class FraktionCog(commands.Cog):
     def __init__(self, bot):
@@ -37,10 +44,13 @@ class FraktionCog(commands.Cog):
         for frak_name, info in data.items():
             valid_warns = []
             for w in info.get("warns", []):
-                if datetime.fromisoformat(w["ablauf"]) > now:
-                    valid_warns.append(w)
-                else:
-                    changed = True
+                try:
+                    if datetime.fromisoformat(w["ablauf"]) > now:
+                        valid_warns.append(w)
+                    else:
+                        changed = True
+                except:
+                    pass
             if len(valid_warns) != len(info.get("warns", [])):
                 info["warns"] = valid_warns
                 changed = True
