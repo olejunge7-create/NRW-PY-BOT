@@ -2,63 +2,43 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import json
+import os
 
-STORAGE_CHANNEL_ID = 1536159967323627631
+FILE_NAME = "fraktionen.json"
+
+def load_data():
+    if not os.path.exists(FILE_NAME):
+        return {}
+    try:
+        with open(FILE_NAME, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_data(data):
+    try:
+        with open(FILE_NAME, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"Fehler beim Speichern: {e}")
 
 class FraktionCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.data = {}
-
-    async def get_storage_channel(self):
-        try:
-            return await self.bot.fetch_channel(STORAGE_CHANNEL_ID)
-        except Exception as e:
-            print(f"❌ Fehler beim Laden des Kanals: {e}")
-            return None
-
-    async def sync_to_discord(self):
-        channel = await self.get_storage_channel()
-        if not channel: return
-        
-        try:
-            async for msg in channel.history(limit=5):
-                if msg.author == self.bot.user:
-                    await msg.delete()
-            await channel.send(json.dumps(self.data, ensure_ascii=False))
-        except Exception as e:
-            print(f"❌ Sync-Fehler: {e}")
-
-    async def load_from_discord(self):
-        channel = await self.get_storage_channel()
-        if not channel: return
-        
-        try:
-            async for msg in channel.history(limit=5):
-                if msg.author == self.bot.user:
-                    try:
-                        self.data = json.loads(msg.content)
-                        return
-                    except:
-                        pass
-            self.data = {}
-        except Exception as e:
-            print(f"❌ Lade-Fehler: {e}")
-            self.data = {}
 
     @app_commands.command(name="addfrak", description="Füge eine neue Fraktion hinzu.")
-    @app_commands.describe(name="Name der Fraktion", besitzer="Leitung", link="Discord Link", standort="Standort")
+    @app_commands.describe(name="Name", besitzer="Leitung", link="Link", standort="Standort")
     async def addfrak(self, interaction: discord.Interaction, name: str, besitzer: str, link: str, standort: str):
         await interaction.response.defer(ephemeral=True)
-        await self.load_from_discord()
+        data = load_data()
         
-        self.data[name] = {
+        data[name] = {
             "besitzer": besitzer,
             "link": link,
             "standort": standort,
             "warns": []
         }
-        await self.sync_to_discord()
+        save_data(data)
         
         embed = discord.Embed(
             title="🏢 Fraktion hinzugefügt",
@@ -67,37 +47,33 @@ class FraktionCog(commands.Cog):
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="delfrak", description="Lösche eine Fraktion komplett.")
-    @app_commands.describe(name="Name der Fraktion")
+    @app_commands.command(name="delfrak", description="Lösche eine Fraktion.")
+    @app_commands.describe(name="Name")
     async def delfrak(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer(ephemeral=True)
-        await self.load_from_discord()
+        data = load_data()
         
-        if name in self.data:
-            del self.data[name]
-            await self.sync_to_discord()
-            await interaction.followup.send(f"🗑️ Die Fraktion **{name}** wurde gelöscht.", ephemeral=True)
+        if name in data:
+            del data[name]
+            save_data(data)
+            await interaction.followup.send(f"🗑️ **{name}** wurde gelöscht.", ephemeral=True)
         else:
-            await interaction.followup.send("❌ Fraktion nicht gefunden.", ephemeral=True)
+            await interaction.followup.send("❌ Nicht gefunden.", ephemeral=True)
 
-    @app_commands.command(name="frakliste", description="Zeigt die offizielle Fraktionsliste.")
+    @app_commands.command(name="frakliste", description="Zeigt die Fraktionsliste.")
     async def frakliste(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        await self.load_from_discord()
+        data = load_data()
         
-        if not self.data:
+        if not data:
             await interaction.followup.send("Aktuell sind keine Fraktionen eingetragen.", ephemeral=True)
             return
             
-        embed = discord.Embed(
-            title="📋 FRAKTIONSLISTE",
-            color=discord.Color.from_rgb(40, 43, 48)
-        )
+        embed = discord.Embed(title="📋 FRAKTIONSLISTE", color=discord.Color.from_rgb(40, 43, 48))
         
-        for name, info in self.data.items():
+        for name, info in data.items():
             warns = info.get("warns", [])
-            anzahl = len(warns)
-            warn_text = "✅ Keine Warns (0/3)" if anzahl == 0 else f"⚠️ **{anzahl}/3 Warns**"
+            warn_text = "✅ Keine Warns (0/3)" if not warns else f"⚠️ {len(warns)}/3 Warns"
             
             value_block = (
                 f"> 👑 **Leitung:** {info.get('besitzer', 'Unbekannt')}\n"
