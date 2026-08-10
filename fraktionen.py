@@ -13,7 +13,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS fraktionen (
             name TEXT PRIMARY KEY,
             besitzer TEXT,
-            link TEXT
+            link TEXT,
+            standort TEXT
         )
     ''')
     cursor.execute('''
@@ -48,8 +49,8 @@ class FraktionCog(commands.Cog):
         conn.close()
 
     @app_commands.command(name="addfrak", description="Füge eine neue Fraktion hinzu.")
-    @app_commands.describe(name="Name der Fraktion", besitzer="Name oder Mention des Besitzers", link="Discord Einladungslink")
-    async def addfrak(self, interaction: discord.Interaction, name: str, besitzer: str, link: str):
+    @app_commands.describe(name="Name der Fraktion", besitzer="Name oder Mention des Besitzers", link="Discord Einladungslink", standort="Standort / Nummer")
+    async def addfrak(self, interaction: discord.Interaction, name: str, besitzer: str, link: str, standort: str):
         await interaction.response.defer(ephemeral=True)
         
         conn = sqlite3.connect(DB_FILE)
@@ -61,18 +62,18 @@ class FraktionCog(commands.Cog):
             await interaction.followup.send(f"❌ Die Fraktion **{name}** existiert bereits!", ephemeral=True)
             return
             
-        cursor.execute("INSERT INTO fraktionen (name, besitzer, link) VALUES (?, ?, ?)", (name, besitzer, link))
+        cursor.execute("INSERT INTO fraktionen (name, besitzer, link, standort) VALUES (?, ?, ?, ?)", (name, besitzer, link, standort))
         conn.commit()
         conn.close()
         
         embed = discord.Embed(
-            title="🏢 Neue Fraktion registriert",
-            description=f"Die Fraktion **{name}** wurde erfolgreich hinzugefügt.",
+            title="🏢 Fraktion hinzugefügt",
+            description=f"Die Fraktion **{name}** wurde erfolgreich eingetragen.",
             color=discord.Color.green()
         )
-        embed.add_field(name="👑 Leitung", value=besitzer, inline=True)
-        embed.add_field(name="🔗 Discord", value=f"[Zum Discord-Server]({link})", inline=True)
-        await interaction.followup.send(embed=embed)
+        embed.add_field(name="Leitung", value=besitzer, inline=True)
+        embed.add_field(name="Standort", value=standort, inline=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="delfrak", description="Lösche eine Fraktion komplett.")
     @app_commands.describe(name="Name der Fraktion")
@@ -118,7 +119,7 @@ class FraktionCog(commands.Cog):
         status_text = f"⚠️ **{anzahl}/3 Warns aktiv**"
         if anzahl >= 3:
             cursor.execute("DELETE FROM warns WHERE fraktion = ?", (name,))
-            status_text = "🔴 **3/3 Limit erreicht!** Warns wurden zurückgesetzt (Sanktion folgt)."
+            status_text = "🔴 **3/3 Limit erreicht!** Warns wurden zurückgesetzt."
             
         conn.commit()
         conn.close()
@@ -128,18 +129,18 @@ class FraktionCog(commands.Cog):
             color=discord.Color.red()
         )
         embed.add_field(name="Grund", value=grund, inline=False)
-        embed.add_field(name="Gültigkeit", value=f"{tage} Tage (Gültig bis: {ablauf.strftime('%d.%m.%Y')})", inline=True)
-        embed.add_field(name="Aktueller Status", value=status_text, inline=True)
+        embed.add_field(name="Gültigkeit", value=f"{tage} Tage (Bis: {ablauf.strftime('%d.%m.%Y')})", inline=True)
+        embed.add_field(name="Status", value=status_text, inline=True)
         await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="frakliste", description="Zeigt die offizielle Fraktionsübersicht.")
+    @app_commands.command(name="frakliste", description="Zeigt die offizielle Fraktionsliste im Clean-Stil.")
     async def frakliste(self, interaction: discord.Interaction):
         await interaction.response.defer()
         
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
-        cursor.execute("SELECT name, besitzer, link FROM fraktionen")
+        cursor.execute("SELECT name, besitzer, link, standort FROM fraktionen")
         fraktionen = cursor.fetchall()
         
         if not fraktionen:
@@ -148,30 +149,31 @@ class FraktionCog(commands.Cog):
             return
             
         embed = discord.Embed(
-            title="⚡ STAATLICHE & ZIVILE FRAKTIONEN",
-            description="Übersicht aller registrierten Fraktionen, Leitungen und des aktuellen Status.",
-            color=discord.Color.from_rgb(30, 144, 255)
+            title="📋 FRAKTIONSLISTE",
+            color=discord.Color.from_rgb(40, 43, 48)
         )
         
-        for name, besitzer, link in fraktionen:
+        for name, besitzer, link, standort in fraktionen:
             cursor.execute("SELECT grund, ablauf FROM warns WHERE fraktion = ?", (name,))
             warns = cursor.fetchall()
             anzahl = len(warns)
             
             if anzahl == 0:
-                warn_text = "Keine (0/3)"
+                warn_text = "✅ Keine Warns (0/3)"
             else:
-                warn_text = f"**{anzahl}/3 Warns**\n"
+                warn_text = f"⚠️ **{anzahl}/3 Warns**\n"
                 for grund, ablauf in warns:
-                    warn_text += f"• {grund} *(bis {ablauf[:10]})*\n"
+                    warn_text += f"      • {grund} *(bis {ablauf[:10]})*\n"
             
+            # Exakter Aufbau wie auf deinem Screenshot
             value_block = (
-                f"• **Leitung:** {besitzer}\n"
-                f"• **Discord:** {link}\n"
-                f"• **Warns:** {warn_text}"
+                f"> 👑 **Leitung:** {besitzer}\n"
+                f"> 🔗 **Discord:** {link}\n"
+                f"> 📍 **Standort:** {standort}\n"
+                f"> 🛡️ **Status:** {warn_text}"
             )
             
-            embed.add_field(name=f"🔹 {name}", value=value_block, inline=False)
+            embed.add_field(name=f"✅ {name}", value=value_block, inline=False)
             
         conn.close()
         await interaction.followup.send(embed=embed)
