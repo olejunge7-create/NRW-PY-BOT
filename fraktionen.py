@@ -1,14 +1,17 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import json
-
-# Trage hier deine echte Kanal-ID von #datenban ein (als Zahl, ohne Anführungszeichen)
-STORAGE_CHANNEL_ID = 123456789012345678
-
+json
 class FraktionCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    async def get_storage_channel(self, guild):
+        # Sucht automatisch nach einem Kanal, der "datenban" oder "datenbank" heißt
+        for channel in guild.text_channels:
+            if "datenban" in channel.name.lower():
+                return channel
+        return None
 
     async def get_data(self, channel):
         async for msg in channel.history(limit=10):
@@ -19,9 +22,10 @@ class FraktionCog(commands.Cog):
     @app_commands.command(name="addfrak", description="Erstelle eine neue Fraktion")
     async def addfrak(self, interaction: discord.Interaction, name: str, inhaber: str, discord_link: str, standort: str):
         await interaction.response.defer(ephemeral=True)
-        channel = self.bot.get_channel(STORAGE_CHANNEL_ID)
+        
+        channel = await self.get_storage_channel(interaction.guild)
         if not channel:
-            await interaction.followup.send("❌ Fehler: Speicher-Kanal nicht gefunden!", ephemeral=True)
+            await interaction.followup.send("❌ Fehler: Konnte keinen Kanal finden, der 'datenban' heißt!", ephemeral=True)
             return
 
         msg, data = await self.get_data(channel)
@@ -43,7 +47,8 @@ class FraktionCog(commands.Cog):
     @app_commands.command(name="frakliste", description="Zeigt die offizielle Fraktionsliste")
     async def frakliste(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        channel = self.bot.get_channel(STORAGE_CHANNEL_ID)
+        
+        channel = await self.get_storage_channel(interaction.guild)
         if not channel:
             await interaction.followup.send("❌ Fehler: Speicher-Kanal nicht gefunden!")
             return
