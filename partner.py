@@ -1,24 +1,23 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import sqlite3
+import json
+import os
 
-PARTNER_DB = "partner.db"
+PARTNER_FILE = "partner_data.json"
 
-def init_partner_db():
-    conn = sqlite3.connect(PARTNER_DB)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS partner (
-            name TEXT PRIMARY KEY,
-            ansprechpartner TEXT,
-            link TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+def load_partner():
+    if os.path.exists(PARTNER_FILE):
+        try:
+            with open(PARTNER_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
 
-init_partner_db()
+def save_partner(data):
+    with open(PARTNER_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 class PartnerCog(commands.Cog):
     def __init__(self, bot):
@@ -29,18 +28,17 @@ class PartnerCog(commands.Cog):
     async def addpartner(self, interaction: discord.Interaction, name: str, ansprechpartner: str, link: str):
         await interaction.response.defer(ephemeral=True)
         
-        conn = sqlite3.connect(PARTNER_DB)
-        cursor = conn.cursor()
+        data = load_partner()
         
-        cursor.execute("SELECT * FROM partner WHERE name = ?", (name,))
-        if cursor.fetchone():
-            conn.close()
+        if name in data:
             await interaction.followup.send(f"❌ Der Partner **{name}** existiert bereits!", ephemeral=True)
             return
             
-        cursor.execute("INSERT INTO partner (name, ansprechpartner, link) VALUES (?, ?, ?)", (name, ansprechpartner, link))
-        conn.commit()
-        conn.close()
+        data[name] = {
+            "ansprechpartner": ansprechpartner,
+            "link": link
+        }
+        save_partner(data)
         
         embed = discord.Embed(
             title="🤝 Partner hinzugefügt",
@@ -56,46 +54,34 @@ class PartnerCog(commands.Cog):
     async def delpartner(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer(ephemeral=True)
         
-        conn = sqlite3.connect(PARTNER_DB)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM partner WHERE name = ?", (name,))
-        if not cursor.fetchone():
-            conn.close()
+        data = load_partner()
+        if name not in data:
             await interaction.followup.send("❌ Partner nicht gefunden.", ephemeral=True)
             return
             
-        cursor.execute("DELETE FROM partner WHERE name = ?", (name,))
-        conn.commit()
-        conn.close()
+        del data[name]
+        save_partner(data)
         
         await interaction.followup.send(f"🗑️ Der Partner **{name}** wurde entfernt.", ephemeral=True)
 
-    @app_commands.command(name="partnerliste", description="Zeigt die offizielle Partner-Liste im Fraktions-Stil.")
+    @app_commands.command(name="partnerliste", description="Zeigt die offizielle Partner-Liste.")
     async def partnerliste(self, interaction: discord.Interaction):
         await interaction.response.defer()
         
-        conn = sqlite3.connect(PARTNER_DB)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT name, ansprechpartner, link FROM partner")
-        partner_eintraege = cursor.fetchall()
-        conn.close()
-        
-        if not partner_eintraege:
+        data = load_partner()
+        if not data:
             await interaction.followup.send("Aktuell sind keine Partnerschaften eingetragen.", ephemeral=True)
             return
             
         embed = discord.Embed(
             title="📋 PARTNERSCHAFTSLISTE",
-            color=discord.Color.from_rgb(40, 43, 48) # Dunkler, cleaner Look passend zum Bild
+            color=discord.Color.from_rgb(40, 43, 48)
         )
         
-        for name, ansprechpartner, link in partner_eintraege:
-            # Hier bauen wir exakt denselben Stil nach wie bei deinen Fraktionen
+        for name, info in data.items():
             value_block = (
-                f"> 👑 **Leitung:** {ansprechpartner}\n"
-                f"> 🔗 **Discord:** {link}"
+                f"> 👑 **Leitung:** {info.get('ansprechpartner', 'Unbekannt')}\n"
+                f"> 🔗 **Discord:** {info.get('link', 'Kein Link')}"
             )
             embed.add_field(name=f"✅ {name}", value=value_block, inline=False)
             
