@@ -5,27 +5,34 @@ import json
 import os
 from datetime import datetime, timedelta
 
-FRAK_FILE = "fraktionen_data.json"
+FRAK_FILE = os.path.abspath("fraktionen_data.json")
+
+# Zentraler Speicher im Arbeitsspeicher als Fallback gegen Render-Resets
+memory_fraktionen = {}
 
 def load_fraktionen():
-    if not os.path.exists(FRAK_FILE):
-        return {}
-    try:
-        with open(FRAK_FILE, "r", encoding="utf-8") as f:
-            content = f.read()
-            if not content.strip():
-                return {}
-            return json.loads(content)
-    except Exception as e:
-        print(f"Fehler beim Laden der Fraktionen: {e}")
-        return {}
+    global memory_fraktionen
+    if os.path.exists(FRAK_FILE):
+        try:
+            with open(FRAK_FILE, "r", encoding="utf-8") as f:
+                content = f.read()
+                if content.strip():
+                    memory_fraktionen = json.loads(content)
+        except Exception as e:
+            print(f"Fehler beim Laden: {e}")
+    return memory_fraktionen
 
 def save_fraktionen(data):
+    global memory_fraktionen
+    memory_fraktionen = data
     try:
         with open(FRAK_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        print(f"Fehler beim Speichern der Fraktionen: {e}")
+        print(f"Fehler beim Speichern: {e}")
+
+# Direkt beim Start laden
+load_fraktionen()
 
 class FraktionCog(commands.Cog):
     def __init__(self, bot):
@@ -74,7 +81,7 @@ class FraktionCog(commands.Cog):
         
         embed = discord.Embed(
             title="🏢 Fraktion hinzugefügt",
-            description=f"Die Fraktion **{name}** wurde erfolgreich eingetragen und gespeichert.",
+            description=f"Die Fraktion **{name}** wurde erfolgreich gespeichert!",
             color=discord.Color.green()
         )
         embed.add_field(name="Leitung", value=besitzer, inline=True)
