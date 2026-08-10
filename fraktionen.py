@@ -2,7 +2,6 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import json
-from datetime import datetime, timedelta
 
 STORAGE_CHANNEL_ID = 1536159967323627631
 
@@ -11,29 +10,30 @@ class FraktionCog(commands.Cog):
         self.bot = bot
         self.data = {}
 
-    async def sync_to_discord(self):
+    async def get_storage_channel(self):
         try:
-            channel = self.bot.get_channel(STORAGE_CHANNEL_ID)
-            if not channel:
-                print("❌ Warnung: Speicher-Kanal für Fraktionen nicht gefunden!")
-                return
-            
-            # Alte Bot-Nachrichten löschen
+            return await self.bot.fetch_channel(STORAGE_CHANNEL_ID)
+        except Exception as e:
+            print(f"❌ Fehler beim Laden des Kanals: {e}")
+            return None
+
+    async def sync_to_discord(self):
+        channel = await self.get_storage_channel()
+        if not channel: return
+        
+        try:
             async for msg in channel.history(limit=5):
                 if msg.author == self.bot.user:
                     await msg.delete()
-            
-            content = json.dumps(self.data, ensure_ascii=False)
-            await channel.send(content)
+            await channel.send(json.dumps(self.data, ensure_ascii=False))
         except Exception as e:
-            print(f"❌ Fehler beim Sync in Discord: {e}")
+            print(f"❌ Sync-Fehler: {e}")
 
     async def load_from_discord(self):
+        channel = await self.get_storage_channel()
+        if not channel: return
+        
         try:
-            channel = self.bot.get_channel(STORAGE_CHANNEL_ID)
-            if not channel:
-                return
-            
             async for msg in channel.history(limit=5):
                 if msg.author == self.bot.user:
                     try:
@@ -43,12 +43,8 @@ class FraktionCog(commands.Cog):
                         pass
             self.data = {}
         except Exception as e:
-            print(f"❌ Fehler beim Laden aus Discord: {e}")
+            print(f"❌ Lade-Fehler: {e}")
             self.data = {}
-
-    @commands.Cog.listener()
-    async def on_ready(self):
-        await self.load_from_discord()
 
     @app_commands.command(name="addfrak", description="Füge eine neue Fraktion hinzu.")
     @app_commands.describe(name="Name der Fraktion", besitzer="Leitung", link="Discord Link", standort="Standort")
@@ -101,11 +97,7 @@ class FraktionCog(commands.Cog):
         for name, info in self.data.items():
             warns = info.get("warns", [])
             anzahl = len(warns)
-            
-            if anzahl == 0:
-                warn_text = "✅ Keine Warns (0/3)"
-            else:
-                warn_text = f"⚠️ **{anzahl}/3 Warns**"
+            warn_text = "✅ Keine Warns (0/3)" if anzahl == 0 else f"⚠️ **{anzahl}/3 Warns**"
             
             value_block = (
                 f"> 👑 **Leitung:** {info.get('besitzer', 'Unbekannt')}\n"
@@ -113,7 +105,6 @@ class FraktionCog(commands.Cog):
                 f"> 📍 **Standort:** {info.get('standort', 'Unbekannt')}\n"
                 f"> 🛡️ **Status:** {warn_text}"
             )
-            
             embed.add_field(name=f"✅ {name}", value=value_block, inline=False)
             
         await interaction.followup.send(embed=embed)
