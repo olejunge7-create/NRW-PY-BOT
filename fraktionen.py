@@ -3,7 +3,8 @@ from discord.ext import commands
 from discord import app_commands
 import json
 
-STORAGE_CHANNEL_ID = 1536159967323627631 # Stelle sicher, dass hier deine ID steht
+# Trage hier deine echte Kanal-ID von #datenban ein (als Zahl, ohne Anführungszeichen)
+STORAGE_CHANNEL_ID = 123456789012345678
 
 class FraktionCog(commands.Cog):
     def __init__(self, bot):
@@ -43,6 +44,10 @@ class FraktionCog(commands.Cog):
     async def frakliste(self, interaction: discord.Interaction):
         await interaction.response.defer()
         channel = self.bot.get_channel(STORAGE_CHANNEL_ID)
+        if not channel:
+            await interaction.followup.send("❌ Fehler: Speicher-Kanal nicht gefunden!")
+            return
+
         _, data = await self.get_data(channel)
         
         if not data:
