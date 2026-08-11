@@ -1,7 +1,8 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-json
+import json
+
 class FraktionCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
