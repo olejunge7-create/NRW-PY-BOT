@@ -8,9 +8,9 @@ class FraktionCog(commands.Cog):
         self.bot = bot
 
     async def get_storage_channel(self, guild):
-        # Sucht automatisch nach einem Kanal, der "datenban" oder "datenbank" heißt
+        # Sucht automatisch nach einem Kanal, der "datenban" oder "#datenbank" heißt
         for channel in guild.text_channels:
-            if "datenban" in channel.name.lower():
+            if "datenban" in channel.name.lower() or "#datenbank"    in channel.name.lower():
                 return channel
         return None
 
