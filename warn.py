@@ -7,33 +7,6 @@ import os
 WARN_FILE = "warns.json"
 memory_warns = {}
 
-# Alle Team-Rollen-IDs (inklusive der 2 neuen)
-TEAM_ROLLEN_IDS = [
-    1534325338182520990,  # Neu hinzugefügt
-    1534325338182520991,  # Rang 1
-    1534325338182520992,  # Rang 2
-    1534325338182520993,  # Rang 3
-    1534325338182520994,  # Rang 4
-    1534325338199556137,  # Rang 5
-    1534325338199556138,  # Rang 6
-    1534325338199556139,  # Rang 7
-    1534325338199556140,  # Rang 8
-    1534325338199556141,  # Neu hinzugefügt
-    1534325338199556142,  # Rang 9
-    1534325338199556143,  # Rang 10
-    1534325338199556145,  # Rang 11
-    1534325338199556146,  # Rang 12
-    1534325338212007978,  # Rang 13
-    1534325338212007979,  # Rang 14
-    1534325338212007980,  # Rang 15
-    1534325338212007981,  # Rang 16
-    1534325338212007982,  # Rang 17
-    1534325338212007983,  # Rang 18
-    1534325338212007984,  # Rang 19
-    1534325338212007985,  # Rang 20
-    1534325338212007986   # Rang 21
-]
-
 def load_warns():
     global memory_warns
     if os.path.exists(WARN_FILE):
@@ -71,40 +44,27 @@ class WarnCog(commands.Cog):
         data[user_id_str].append(grund)
         anzahl = len(data[user_id_str])
         
-        team_status = ""
+        kick_status = ""
         
-        # Wenn das Limit von 3 Warns erreicht ist
+        # Prüfen, ob es der 3. Warn ist
         if anzahl >= 3:
+            # Alle Warns zurücksetzen
             data[user_id_str] = []
             save_warns(data)
             
-            # Alle Team-Rollen der Liste entfernen, die der User besitzt
-            entfernte_rollen = 0
-            for rolle_id in TEAM_ROLLEN_IDS:
-                role = interaction.guild.get_role(rolle_id)
-                if role and role in user.roles:
-                    try:
-                        await user.remove_roles(role, reason="3/3 Verwarnungen erreicht - Team-Rollen entzogen.")
-                        entfernte_rollen += 1
-                    except Exception:
-                        pass
-            
-            team_status = f"\n\n🔴 **Limit erreicht (3/3):** Warns zurückgesetzt und {entfernte_rollen} Team-Rolle(n) entzogen!"
-            
-            embed = discord.Embed(
-                title="⚠️ User verwarnt (Team-Rollen entzogen)",
-                description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** 3/3{team_status}",
-                color=discord.Color.red()
-            )
-            await interaction.response.send_message(embed=embed)
-            return
-
-        save_warns(data)
+            # Versuchen den User zu kicken
+            try:
+                await user.kick(reason="3/3 Verwarnungen erreicht.")
+                kick_status = "\n\n🔴 **Limit erreicht (3/3):** Alle Warns wurden gelöscht und der User wurde gekickt!"
+            except Exception:
+                kick_status = "\n\n⚠️ **Limit erreicht (3/3):** Warns wurden gelöscht, aber der Bot konnte den User nicht kicken (fehlende Rechte / Höherer Rang)."
+        else:
+            save_warns(data)
         
         embed = discord.Embed(
             title="⚠️ User verwarnt",
-            description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** {anzahl}/3",
-            color=discord.Color.orange()
+            description=f"**User:** {user.mention}\n**Grund:** {grund}\n**Anzahl Warns:** {anzahl}/3{kick_status}",
+            color=discord.Color.red() if anzahl >= 3 else discord.Color.orange()
         )
         await interaction.response.send_message(embed=embed)
 

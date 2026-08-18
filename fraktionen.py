@@ -26,7 +26,7 @@ class FraktionCog(commands.Cog):
         
         channel = await self.get_storage_channel(interaction.guild)
         if not channel:
-            await interaction.followup.send("❌ Fehler: Konnte keinen Kanal finden, der 'datenban' oder '#datenbank' heißt!", ephemeral=True)
+            await interaction.followup.send("❌ Fehler: Konnte keinen Kanal finden, der 'datenban' heißt!", ephemeral=True)
             return
 
         msg, data = await self.get_data(channel)
